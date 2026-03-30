@@ -1,10 +1,10 @@
 'use client'
-import { X, MapPin, Zap, Building2, Users, Star } from 'lucide-react'
+import { X, MapPin } from 'lucide-react'
 import type { OkloSite } from '@/lib/types'
 
 interface Props {
   site: OkloSite | null
-  zipInfo: { income?: number; unemployment?: number; iso?: string } | null
+  zipInfo: { income?: number; unemployment?: number; iso?: string; electricityPrice?: number } | null
   searchedZip: string | null
   onClose: () => void
 }
@@ -81,7 +81,6 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
               </div>
             </div>
 
-            {/* Data center interest */}
             {(site.ntt || site.equinix || site.vantage) && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>DC Tenant Interest</div>
@@ -93,7 +92,6 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
               </div>
             )}
 
-            {/* MD Ranking Score */}
             {site.mdScore && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>MD Ranking Score</div>
@@ -123,6 +121,41 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
         ) : zipInfo || searchedZip ? (
           <>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>ZIP: {searchedZip}</div>
+
+            {zipInfo?.electricityPrice !== undefined && (
+              <div style={{ padding: '10px 12px', background: '#111827', borderRadius: 8, marginBottom: 8, border: '1px solid #374151' }}>
+                <div style={{ fontSize: 10, color: '#fbbf24', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>
+                  \u26a1 Avg Retail Electricity Price
+                </div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <div style={{
+                    fontSize: 22, fontWeight: 800,
+                    color: zipInfo.electricityPrice < 11 ? '#22c55e'
+                      : zipInfo.electricityPrice < 16 ? '#fbbf24'
+                      : zipInfo.electricityPrice < 22 ? '#f97316' : '#ef4444'
+                  }}>
+                    {zipInfo.electricityPrice.toFixed(1)}\u00a2
+                  </div>
+                  <div style={{ fontSize: 13, color: '#9ca3af' }}>/ kWh</div>
+                </div>
+                <div style={{
+                  fontSize: 11, marginTop: 4,
+                  color: zipInfo.electricityPrice < 11 ? '#22c55e'
+                    : zipInfo.electricityPrice < 16 ? '#d1d5db'
+                    : '#f97316'
+                }}>
+                  {zipInfo.electricityPrice < 11
+                    ? '\u2713 Below US avg \u2014 cost-competitive'
+                    : zipInfo.electricityPrice < 16
+                    ? '\u007e Near US avg (13.3\u00a2/kWh)'
+                    : zipInfo.electricityPrice < 22
+                    ? '\u2191 Above avg \u2014 SMR value case strong'
+                    : '\u26a0 High-cost market \u2014 SMR highly valuable'}
+                </div>
+                <div style={{ fontSize: 10, color: '#4b5563', marginTop: 3 }}>EIA state average \u2014 2023</div>
+              </div>
+            )}
+
             {zipInfo?.income && (
               <div style={{ padding: '10px 12px', background: '#111827', borderRadius: 8, marginBottom: 8 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Median Household Income</div>
@@ -138,7 +171,7 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
               </div>
             )}
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 8 }}>
-              Toggle Income or Unemployment layers to see county-level data for this area.
+              Toggle Income, Unemployment, or Electricity Price layers to see area data.
             </div>
           </>
         ) : null}
