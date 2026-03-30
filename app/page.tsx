@@ -31,7 +31,7 @@ export default function Home() {
   const [loadingLayers, setLoadingLayers] = useState<string[]>([])
   const [selectedSite, setSelectedSite] = useState<OkloSite | null>(null)
   const [searchedZip, setSearchedZip] = useState<{ lat: number; lng: number; zip: string; fips?: string } | null>(null)
-  const [zipInfo, setZipInfo] = useState<{ income?: number; unemployment?: number; iso?: string } | null>(null)
+  const [zipInfo, setZipInfo] = useState<{ income?: number; unemployment?: number; iso?: string; electricityPrice?: number } | null>(null)
 
   const toggleLayer = useCallback((id: string) => {
     setActiveLayers(prev => {
