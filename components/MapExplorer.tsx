@@ -10,7 +10,7 @@ interface Props {
   activeLayers: string[]
   searchedZip: { lat: number; lng: number; zip: string; fips?: string } | null
   onSiteSelect: (site: OkloSite | null) => void
-  onZipInfo: (info: { income?: number; unemployment?: number; iso?: string; state?: string; electricityPrice?: number }) => void
+  onZipInfo: (info: { income?: number; unemployment?: number; iso?: string; state?: string; electricityPrice?: number; electricityPrev?: number }) => void
 }
 
 export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, onZipInfo }: Props) {
@@ -19,6 +19,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   const layerRefs = useRef<Record<string, any>>({})
   const censusCacheRef = useRef<{ income?: Record<string, number>; unemployment?: Record<string, number> }>({})
   const electricityDataRef = useRef<Record<string, number>>({})
+  const electricityPrevRef = useRef<Record<string, number>>({})
+  const electricityZoomListenerRef = useRef<(() => void) | null>(null)
 
   const FIPS_TO_ABBR: Record<string, string> = {
     '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE','11':'DC',
@@ -38,16 +40,10 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     })
-    const map = L.map(containerRef.current!, {
-      center: [39.5, -98.35],
-      zoom: 4,
-      zoomControl: false,
-      attributionControl: true,
-    })
+    const map = L.map(containerRef.current!, { center: [39.5, -98.35], zoom: 4, zoomControl: false, attributionControl: true })
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
-      maxZoom: 19,
-      subdomains: 'abcd',
+      maxZoom: 19, subdomains: 'abcd',
     }).addTo(map)
     L.control.zoom({ position: 'bottomright' }).addTo(map)
     mapRef.current = map
@@ -64,13 +60,10 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       const icon = L.divIcon({
         className: '',
         html: `<div style="width:${size}px;height:${size}px;background:#f97316;border:2px solid #fff;border-radius:50%;box-shadow:0 0 ${priority >= 4 ? 10 : 6}px rgba(249,115,22,${opacity});opacity:${opacity};"></div>`,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
-        popupAnchor: [0, -size / 2],
+        iconSize: [size, size], iconAnchor: [size/2, size/2], popupAnchor: [0, -size/2],
       })
       const tenants = [site.ntt && 'NTT', site.equinix && 'Equinix', site.vantage && 'Vantage'].filter(Boolean).join(', ')
-      const scoreHtml = site.mdScore
-        ? `<div style="margin-top:8px;padding:6px;background:#111827;border-radius:4px;"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px;">MD Ranking Score</div><div style="font-size:18px;color:#f97316;font-weight:700;">${site.mdScore.total.toFixed(1)}/10</div><div style="font-size:11px;color:#6b7280;">Confidence: ${Math.round(site.mdScore.confidence * 100)}%</div></div>` : ''
+      const scoreHtml = site.mdScore ? `<div style="margin-top:8px;padding:6px;background:#111827;border-radius:4px;"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px;">MD Ranking Score</div><div style="font-size:18px;color:#f97316;font-weight:700;">${site.mdScore.total.toFixed(1)}/10</div><div style="font-size:11px;color:#6b7280;">Confidence: ${Math.round(site.mdScore.confidence * 100)}%</div></div>` : ''
       const popup = L.popup({ maxWidth: 280, className: 'oklo-popup' }).setContent(`
         <div style="font-family:system-ui,sans-serif;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -140,13 +133,7 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           const fips = feature.id?.toString().padStart(2, '0') || ''
           const abbr = fipsToAbbr[fips] || ''
           const friendly = NUCLEAR_FRIENDLY_STATES.includes(abbr)
-          return {
-            fillColor: friendly ? '#06b6d4' : '#6b7280',
-            fillOpacity: friendly ? 0.3 : 0.05,
-            color: friendly ? '#06b6d4' : 'transparent',
-            weight: friendly ? 1 : 0,
-            opacity: 0.5
-          }
+          return { fillColor: friendly ? '#06b6d4' : '#6b7280', fillOpacity: friendly ? 0.3 : 0.05, color: friendly ? '#06b6d4' : 'transparent', weight: friendly ? 1 : 0, opacity: 0.5 }
         },
         onEachFeature: (feature: any, layer: any) => {
           const fips = feature.id?.toString().padStart(2, '0') || ''
@@ -199,13 +186,11 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
         onEachFeature: (feature: any, layer: any) => {
           const fips = feature.id?.toString().padStart(5, '0') || ''
           const value = censusData[fips]
-          const formatted = type === 'income'
-            ? value ? `$${value.toLocaleString()}` : 'N/A'
-            : value ? `${value.toFixed(1)}%` : 'N/A'
-          layer.bindTooltip(
-            `<b>${feature.properties?.name || 'County'}</b><br>${type === 'income' ? 'Median Income' : 'Unemployment'}: ${formatted}`,
-            { sticky: true }
-          )
+          const formatted = type === 'income' ? (value ? `$${value.toLocaleString()}` : 'N/A') : (value ? `${value.toFixed(1)}%` : 'N/A')
+          const sourceNote = type === 'income'
+            ? '<br><span style="font-size:10px;color:#6b7280">Annual ACS 5-yr est. • Trend: see Census ACS YoY</span>'
+            : '<br><span style="font-size:10px;color:#6b7280">Annual ACS 5-yr est. • Monthly BLS data by state only</span>'
+          layer.bindTooltip(`<b>${feature.properties?.name || 'County'}</b><br>${type === 'income' ? 'Median Income' : 'Unemployment'}: ${formatted}${sourceNote}`, { sticky: true })
         }
       })
       layer.addTo(map)
@@ -217,15 +202,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
     const group = L.layerGroup()
     COAL_PLANTS.forEach(plant => {
       const color = plant.status === 'operating' ? '#ef4444' : plant.status === 'retiring' ? '#f97316' : '#6b7280'
-      const circle = L.circleMarker([plant.lat, plant.lng], {
-        radius: Math.max(4, Math.min(14, plant.capacityMW / 250)),
-        fillColor: color, fillOpacity: 0.8,
-        color: '#fff', weight: 1, opacity: 0.8
-      })
-      circle.bindTooltip(
-        `<b>${plant.name}</b><br>${plant.city}, ${plant.state}<br>Capacity: ${plant.capacityMW.toLocaleString()} MW<br>Status: <span style="color:${color}">${plant.status.toUpperCase()}${plant.retirementYear ? ` (${plant.retirementYear})` : ''}</span><br>${plant.owner ? `Owner: ${plant.owner}` : ''}`,
-        { sticky: true }
-      )
+      const circle = L.circleMarker([plant.lat, plant.lng], { radius: Math.max(4, Math.min(14, plant.capacityMW / 250)), fillColor: color, fillOpacity: 0.8, color: '#fff', weight: 1, opacity: 0.8 })
+      circle.bindTooltip(`<b>${plant.name}</b><br>${plant.city}, ${plant.state}<br>Capacity: ${plant.capacityMW.toLocaleString()} MW<br>Status: <span style="color:${color}">${plant.status.toUpperCase()}${plant.retirementYear ? ` (${plant.retirementYear})` : ''}</span><br>${plant.owner ? `Owner: ${plant.owner}` : ''}`, { sticky: true })
       group.addLayer(circle)
     })
     group.addTo(map)
@@ -235,11 +213,7 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   const addSubstationsLayer = (L: any, map: any) => {
     const group = L.layerGroup()
     SUBSTATIONS.forEach(sub => {
-      const icon = L.divIcon({
-        className: '',
-        html: `<div style="width:10px;height:10px;background:#f59e0b;border:1.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 6px rgba(245,158,11,0.8);"></div>`,
-        iconSize: [10, 10], iconAnchor: [5, 5], popupAnchor: [0, -8],
-      })
+      const icon = L.divIcon({ className: '', html: `<div style="width:10px;height:10px;background:#f59e0b;border:1.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 6px rgba(245,158,11,0.8);"></div>`, iconSize: [10,10], iconAnchor: [5,5], popupAnchor: [0,-8] })
       const marker = L.marker([sub.lat, sub.lng], { icon })
       marker.bindTooltip(`<b>${sub.name}</b><br>${sub.state} | ${sub.voltageKV}kV | ${sub.iso}`, { sticky: true })
       group.addLayer(marker)
@@ -250,22 +224,19 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
 
   const addGovLandLayer = async (L: any, map: any) => {
     const fedLandAreas = [
-      { name: 'Idaho National Lab', coords: [[43.2, -113.5], [44.0, -113.5], [44.0, -112.0], [43.2, -112.0]] },
-      { name: 'Savannah River Site', coords: [[33.2, -82.0], [33.6, -82.0], [33.6, -81.3], [33.2, -81.3]] },
-      { name: 'Oak Ridge Reservation', coords: [[35.8, -84.5], [36.2, -84.5], [36.2, -84.1], [35.8, -84.1]] },
-      { name: 'Hanford Site (WA)', coords: [[46.4, -119.9], [46.9, -119.9], [46.9, -119.2], [46.4, -119.2]] },
-      { name: 'Nevada Test Site', coords: [[36.7, -116.7], [37.4, -116.7], [37.4, -115.8], [36.7, -115.8]] },
-      { name: 'Pantex Plant (TX)', coords: [[35.2, -101.8], [35.5, -101.8], [35.5, -101.4], [35.2, -101.4]] },
-      { name: 'Portsmouth GDP (OH)', coords: [[38.9, -83.2], [39.1, -83.2], [39.1, -82.9], [38.9, -82.9]] },
-      { name: 'Paducah GDP (KY)', coords: [[36.9, -89.0], [37.1, -89.0], [37.1, -88.7], [36.9, -88.7]] },
-      { name: 'Los Alamos NL (NM)', coords: [[35.7, -106.5], [35.95, -106.5], [35.95, -106.0], [35.7, -106.0]] },
+      { name: 'Idaho National Lab', coords: [[43.2,-113.5],[44.0,-113.5],[44.0,-112.0],[43.2,-112.0]] },
+      { name: 'Savannah River Site', coords: [[33.2,-82.0],[33.6,-82.0],[33.6,-81.3],[33.2,-81.3]] },
+      { name: 'Oak Ridge Reservation', coords: [[35.8,-84.5],[36.2,-84.5],[36.2,-84.1],[35.8,-84.1]] },
+      { name: 'Hanford Site (WA)', coords: [[46.4,-119.9],[46.9,-119.9],[46.9,-119.2],[46.4,-119.2]] },
+      { name: 'Nevada Test Site', coords: [[36.7,-116.7],[37.4,-116.7],[37.4,-115.8],[36.7,-115.8]] },
+      { name: 'Pantex Plant (TX)', coords: [[35.2,-101.8],[35.5,-101.8],[35.5,-101.4],[35.2,-101.4]] },
+      { name: 'Portsmouth GDP (OH)', coords: [[38.9,-83.2],[39.1,-83.2],[39.1,-82.9],[38.9,-82.9]] },
+      { name: 'Paducah GDP (KY)', coords: [[36.9,-89.0],[37.1,-89.0],[37.1,-88.7],[36.9,-88.7]] },
+      { name: 'Los Alamos NL (NM)', coords: [[35.7,-106.5],[35.95,-106.5],[35.95,-106.0],[35.7,-106.0]] },
     ]
     const group = L.layerGroup()
     fedLandAreas.forEach(area => {
-      const poly = L.polygon(area.coords, {
-        fillColor: '#22c55e', fillOpacity: 0.25,
-        color: '#22c55e', weight: 1.5, opacity: 0.6
-      })
+      const poly = L.polygon(area.coords, { fillColor: '#22c55e', fillOpacity: 0.25, color: '#22c55e', weight: 1.5, opacity: 0.6 })
       poly.bindTooltip(`<b>${area.name}</b><br>Federal Land (DOE / DOD)`, { sticky: true })
       group.addLayer(poly)
     })
@@ -273,46 +244,88 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
     layerRefs.current['govland'] = group
   }
 
+  const getElectricityColor = (price: number) => {
+    if (price < 9)  return '#166534'
+    if (price < 11) return '#22c55e'
+    if (price < 13) return '#84cc16'
+    if (price < 16) return '#fbbf24'
+    if (price < 20) return '#f97316'
+    if (price < 26) return '#ef4444'
+    return '#7f1d1d'
+  }
+
+  const getElectricityTrendHtml = (price: number, prev: number | undefined) => {
+    if (prev === undefined) return ''
+    const delta = price - prev
+    return `<br><span style="font-size:10px;color:${delta>0?'#ef4444':delta<0?'#22c55e':'#9ca3af'}">${delta>0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}¢ vs prev month</span>`
+  }
+
   const addElectricityLayer = async (L: any, map: any) => {
     try {
-      const [topoModule, topoRes, priceRes] = await Promise.all([
+      const [topoModule, stateRes, countyRes, priceRes] = await Promise.all([
         import('topojson-client'),
         fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json'),
+        fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json'),
         fetch('/api/electricity-prices')
       ])
-      const [topoData, priceJson] = await Promise.all([topoRes.json(), priceRes.json()])
+      const [stateData, countyData, priceJson] = await Promise.all([stateRes.json(), countyRes.json(), priceRes.json()])
       const priceData: Record<string, number> = priceJson.data || {}
+      const prevData: Record<string, number> = priceJson.prevData || {}
       electricityDataRef.current = priceData
-      const states = (topoModule as any).feature(topoData, topoData.objects.states)
-      const getColor = (price: number) => {
-        if (price < 9)  return '#166534'
-        if (price < 11) return '#22c55e'
-        if (price < 13) return '#84cc16'
-        if (price < 16) return '#fbbf24'
-        if (price < 20) return '#f97316'
-        if (price < 26) return '#ef4444'
-        return '#7f1d1d'
-      }
-      const layer = L.geoJSON(states, {
+      electricityPrevRef.current = prevData
+      const states = (topoModule as any).feature(stateData, stateData.objects.states)
+      const counties = (topoModule as any).feature(countyData, countyData.objects.counties)
+
+      const stateLayer = L.geoJSON(states, {
         style: (feature: any) => {
           const fips = feature.id?.toString().padStart(2, '0') || ''
           const abbr = FIPS_TO_ABBR[fips] || ''
           const price = priceData[abbr]
           if (!price) return { fillColor: '#374151', fillOpacity: 0.3, color: '#4b5563', weight: 1 }
-          return { fillColor: getColor(price), fillOpacity: 0.65, color: '#111827', weight: 1, opacity: 0.8 }
+          return { fillColor: getElectricityColor(price), fillOpacity: 0.65, color: '#111827', weight: 1, opacity: 0.8 }
         },
         onEachFeature: (feature: any, layer: any) => {
           const fips = feature.id?.toString().padStart(2, '0') || ''
           const abbr = FIPS_TO_ABBR[fips] || ''
           const price = priceData[abbr]
+          const prev = prevData[abbr]
+          const trendHtml = getElectricityTrendHtml(price || 0, prev)
           const label = price
-            ? `<b>${abbr}</b><br>⚡ ${price.toFixed(1)}¢/kWh avg retail<br><span style="font-size:11px;color:#9ca3af">${price < 11 ? '✓ Low cost' : price < 16 ? '~ US avg' : price < 22 ? '↑ Above avg' : '⚠ High cost'}</span>`
+            ? `<b>${abbr}</b><br>⚡ ${price.toFixed(1)}¢/kWh avg retail${trendHtml}<br><span style="font-size:11px;color:#9ca3af">${price < 11 ? '✓ Low cost' : price < 16 ? '~ US avg' : price < 22 ? '↑ Above avg' : '⚠ High cost'}</span>`
             : `<b>${abbr}</b><br>No data`
           layer.bindTooltip(label, { sticky: true })
         }
       })
-      layer.addTo(map)
-      layerRefs.current['electricity'] = layer
+
+      const countyLayer = L.geoJSON(counties, {
+        style: (feature: any) => {
+          const countyFips = feature.id?.toString().padStart(5, '0') || ''
+          const stateFips = countyFips.substring(0, 2)
+          const stateAbbr = FIPS_TO_ABBR[stateFips] || ''
+          const price = priceData[stateAbbr]
+          if (!price) return { fillColor: '#1f2937', fillOpacity: 0.3, color: '#374151', weight: 0.3 }
+          return { fillColor: getElectricityColor(price), fillOpacity: 0.6, color: '#374151', weight: 0.3, opacity: 0.5 }
+        },
+        onEachFeature: (feature: any, layer: any) => {
+          const countyFips = feature.id?.toString().padStart(5, '0') || ''
+          const stateFips = countyFips.substring(0, 2)
+          const stateAbbr = FIPS_TO_ABBR[stateFips] || ''
+          const price = priceData[stateAbbr]
+          const prev = prevData[stateAbbr]
+          const trendHtml = getElectricityTrendHtml(price || 0, prev)
+          const label = price
+            ? `<b>${feature.properties?.name || 'County'}, ${stateAbbr}</b><br>⚡ ${price.toFixed(1)}¢/kWh (state avg)${trendHtml}<br><span style="font-size:10px;color:#6b7280">County-level EIA data unavailable — using state avg</span>`
+            : `<b>${feature.properties?.name || 'County'}, ${stateAbbr}</b><br>No data`
+          layer.bindTooltip(label, { sticky: true })
+        }
+      })
+
+      const initialLayer = map.getZoom() >= 6 ? countyLayer : stateLayer
+      initialLayer.addTo(map)
+      layerRefs.current['electricity'] = initialLayer
+      layerRefs.current['electricity-state'] = stateLayer
+      layerRefs.current['electricity-county'] = countyLayer
+
       const legend = (L.control as any)({ position: 'bottomleft' })
       legend.onAdd = () => {
         const div = L.DomUtil.create('div')
@@ -322,6 +335,19 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       }
       legend.addTo(map)
       layerRefs.current['electricity-legend'] = legend
+
+      const zoomEndListener = () => {
+        const zoom = map.getZoom()
+        const currentIsCounty = layerRefs.current['electricity'] === layerRefs.current['electricity-county']
+        const shouldBeCounty = zoom >= 6
+        if (currentIsCounty !== shouldBeCounty) {
+          if (layerRefs.current['electricity']) map.removeLayer(layerRefs.current['electricity'])
+          const nextLayer = shouldBeCounty ? layerRefs.current['electricity-county'] : layerRefs.current['electricity-state']
+          if (nextLayer) { nextLayer.addTo(map); layerRefs.current['electricity'] = nextLayer }
+        }
+      }
+      map.on('zoomend', zoomEndListener)
+      electricityZoomListenerRef.current = () => map.off('zoomend', zoomEndListener)
     } catch (e) { console.error('Electricity layer error:', e) }
   }
 
@@ -332,7 +358,20 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
     const map = mapRef.current
     const toggleLayer = async (id: string, active: boolean) => {
       if (!active) {
-        if (layerRefs.current[id]) { map.removeLayer(layerRefs.current[id]); delete layerRefs.current[id] }
+        if (id === 'electricity') {
+          electricityZoomListenerRef.current?.()
+          electricityZoomListenerRef.current = null
+          if (layerRefs.current['electricity']) map.removeLayer(layerRefs.current['electricity'])
+          if (layerRefs.current['electricity-state']) map.removeLayer(layerRefs.current['electricity-state'])
+          if (layerRefs.current['electricity-county']) map.removeLayer(layerRefs.current['electricity-county'])
+          if (layerRefs.current['electricity-legend']) map.removeControl(layerRefs.current['electricity-legend'])
+          delete layerRefs.current['electricity']
+          delete layerRefs.current['electricity-state']
+          delete layerRefs.current['electricity-county']
+          delete layerRefs.current['electricity-legend']
+        } else {
+          if (layerRefs.current[id]) { map.removeLayer(layerRefs.current[id]); delete layerRefs.current[id] }
+        }
         return
       }
       if (layerRefs.current[id]) return
@@ -346,18 +385,9 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
         case 'govland': await addGovLandLayer(L, map); break
         case 'nuclear': await addNuclearLayer(L, map); break
         case 'electricity': await addElectricityLayer(L, map); break
-        case 'sites':
-          if (!layerRefs.current['sites']) { addOkloSites(L, map) }
-          break
+        case 'sites': if (!layerRefs.current['sites']) { addOkloSites(L, map) } break
       }
     }
-    const handleElectricityOff = (active: boolean) => {
-      if (!active && layerRefs.current['electricity-legend']) {
-        mapRef.current?.removeControl(layerRefs.current['electricity-legend'])
-        delete layerRefs.current['electricity-legend']
-      }
-    }
-    if (!activeLayers.includes('electricity')) handleElectricityOff(false)
     const allIds = ['iso', 'income', 'unemployment', 'coal', 'substations', 'govland', 'nuclear', 'electricity', 'sites']
     allIds.forEach(id => toggleLayer(id, activeLayers.includes(id)))
   }, [activeLayers])
@@ -366,13 +396,9 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
     if (!searchedZip || !mapRef.current) return
     const map = mapRef.current
     import('leaflet').then(({ default: L }) => {
-      if (layerRefs.current['zipHighlight']) { map.removeLayer(layerRefs.current['zipHighlight']) }
+      if (layerRefs.current['zipHighlight']) map.removeLayer(layerRefs.current['zipHighlight'])
       map.flyTo([searchedZip.lat, searchedZip.lng], 10, { animate: true, duration: 1.5 })
-      const circle = L.circle([searchedZip.lat, searchedZip.lng], {
-        radius: 8000,
-        fillColor: '#f97316', fillOpacity: 0.15,
-        color: '#f97316', weight: 2, opacity: 0.8
-      })
+      const circle = L.circle([searchedZip.lat, searchedZip.lng], { radius: 8000, fillColor: '#f97316', fillOpacity: 0.15, color: '#f97316', weight: 2, opacity: 0.8 })
       circle.addTo(map)
       circle.bindPopup(`<b>ZIP: ${searchedZip.zip}</b><br>Lat: ${searchedZip.lat.toFixed(4)}, Lng: ${searchedZip.lng.toFixed(4)}`).openPopup()
       layerRefs.current['zipHighlight'] = circle
@@ -380,23 +406,23 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       const stateFips = fips ? fips.substring(0, 2) : ''
       const stateAbbr = FIPS_TO_ABBR[stateFips] || ''
       const getElectricityPrice = async () => {
-        if (electricityDataRef.current[stateAbbr] !== undefined) {
-          return electricityDataRef.current[stateAbbr]
-        }
+        if (electricityDataRef.current[stateAbbr] !== undefined) return electricityDataRef.current[stateAbbr]
         try {
           const r = await fetch('/api/electricity-prices')
           const json = await r.json()
           electricityDataRef.current = json.data || {}
+          electricityPrevRef.current = json.prevData || {}
           return electricityDataRef.current[stateAbbr]
         } catch { return undefined }
       }
       getElectricityPrice().then(electricityPrice => {
+        const electricityPrev = electricityPrevRef.current[stateAbbr]
         if (fips) {
           const income = censusCacheRef.current.income?.[fips]
           const unemployment = censusCacheRef.current.unemployment?.[fips]
-          onZipInfo({ income, unemployment, state: stateFips, electricityPrice })
+          onZipInfo({ income, unemployment, state: stateFips, electricityPrice, electricityPrev })
         } else if (stateAbbr) {
-          onZipInfo({ electricityPrice, state: stateFips })
+          onZipInfo({ electricityPrice, state: stateFips, electricityPrev })
         }
       })
     })
