@@ -1,10 +1,10 @@
 'use client'
-import { X, MapPin } from 'lucide-react'
+import { X, MapPin, Zap, Building2, Users, Star } from 'lucide-react'
 import type { OkloSite } from '@/lib/types'
 
 interface Props {
   site: OkloSite | null
-  zipInfo: { income?: number; unemployment?: number; iso?: string; electricityPrice?: number } | null
+  zipInfo: { income?: number; unemployment?: number; iso?: string; electricityPrice?: number; electricityPrev?: number } | null
   searchedZip: string | null
   onClose: () => void
 }
@@ -16,10 +16,7 @@ const PriorityBadge = ({ p }: { p: number }) => {
   }
   const [fg, bg] = colors[p] || colors[1]
   return (
-    <span style={{
-      padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700,
-      background: bg, color: fg, border: `1px solid ${fg}40`
-    }}>P{p} Priority</span>
+    <span style={{ padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700, background: bg, color: fg, border: `1px solid ${fg}40` }}>P{p} Priority</span>
   )
 }
 
@@ -46,10 +43,7 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
       borderRadius: 12, border: '1px solid #374151', overflow: 'hidden',
       boxShadow: '0 20px 60px rgba(0,0,0,0.6)', zIndex: 1000, display: 'flex', flexDirection: 'column'
     }}>
-      <div style={{
-        padding: '12px 14px', borderBottom: '1px solid #374151',
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between'
-      }}>
+      <div style={{ padding: '12px 14px', borderBottom: '1px solid #374151', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 12, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           {site ? 'Site Detail' : 'Area Analysis'}
         </span>
@@ -69,7 +63,6 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
               </div>
               <PriorityBadge p={site.priority} />
             </div>
-
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 12 }}>
               <div style={{ padding: '8px', background: '#111827', borderRadius: 8 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 2 }}>Owner</div>
@@ -80,7 +73,6 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
                 <div style={{ fontSize: 12, color: '#93c5fd', fontWeight: 500 }}>{site.iso || 'N/A'}</div>
               </div>
             </div>
-
             {(site.ntt || site.equinix || site.vantage) && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>DC Tenant Interest</div>
@@ -91,7 +83,6 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
                 </div>
               </div>
             )}
-
             {site.mdScore && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>MD Ranking Score</div>
@@ -107,55 +98,17 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
                 <ScoreBar label="Risk Management" value={site.mdScore.riskManagement} color="#ef4444" />
               </div>
             )}
-
             {site.nextSteps && (
               <div style={{ padding: 10, background: '#422006', border: '1px solid #92400e', borderRadius: 8, marginBottom: 8 }}>
                 <div style={{ fontSize: 10, color: '#fbbf24', marginBottom: 3, fontWeight: 600 }}>Next Steps</div>
                 <div style={{ fontSize: 11, color: '#fde68a' }}>{site.nextSteps}</div>
               </div>
             )}
-            {site.notes && (
-              <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.5 }}>{site.notes}</div>
-            )}
+            {site.notes && <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.5 }}>{site.notes}</div>}
           </>
         ) : zipInfo || searchedZip ? (
           <>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#e2e8f0', marginBottom: 12 }}>ZIP: {searchedZip}</div>
-
-            {zipInfo?.electricityPrice !== undefined && (
-              <div style={{ padding: '10px 12px', background: '#111827', borderRadius: 8, marginBottom: 8, border: '1px solid #374151' }}>
-                <div style={{ fontSize: 10, color: '#fbbf24', marginBottom: 4, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '.05em' }}>
-                  \u26a1 Avg Retail Electricity Price
-                </div>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-                  <div style={{
-                    fontSize: 22, fontWeight: 800,
-                    color: zipInfo.electricityPrice < 11 ? '#22c55e'
-                      : zipInfo.electricityPrice < 16 ? '#fbbf24'
-                      : zipInfo.electricityPrice < 22 ? '#f97316' : '#ef4444'
-                  }}>
-                    {zipInfo.electricityPrice.toFixed(1)}\u00a2
-                  </div>
-                  <div style={{ fontSize: 13, color: '#9ca3af' }}>/ kWh</div>
-                </div>
-                <div style={{
-                  fontSize: 11, marginTop: 4,
-                  color: zipInfo.electricityPrice < 11 ? '#22c55e'
-                    : zipInfo.electricityPrice < 16 ? '#d1d5db'
-                    : '#f97316'
-                }}>
-                  {zipInfo.electricityPrice < 11
-                    ? '\u2713 Below US avg \u2014 cost-competitive'
-                    : zipInfo.electricityPrice < 16
-                    ? '\u007e Near US avg (13.3\u00a2/kWh)'
-                    : zipInfo.electricityPrice < 22
-                    ? '\u2191 Above avg \u2014 SMR value case strong'
-                    : '\u26a0 High-cost market \u2014 SMR highly valuable'}
-                </div>
-                <div style={{ fontSize: 10, color: '#4b5563', marginTop: 3 }}>EIA state average \u2014 2023</div>
-              </div>
-            )}
-
             {zipInfo?.income && (
               <div style={{ padding: '10px 12px', background: '#111827', borderRadius: 8, marginBottom: 8 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Median Household Income</div>
@@ -168,6 +121,38 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>County Unemployment Rate</div>
                 <div style={{ fontSize: 18, fontWeight: 700, color: '#10b981' }}>{zipInfo.unemployment?.toFixed(1)}%</div>
                 <div style={{ fontSize: 10, color: '#9ca3af' }}>2022 ACS 5-Year Estimate</div>
+              </div>
+            )}
+            {zipInfo?.electricityPrice !== undefined && (
+              <div style={{ padding: '10px 12px', background: '#111827', borderRadius: 8, marginBottom: 8 }}>
+                <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 4 }}>Avg Retail Electricity Price</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+                  <div style={{
+                    fontSize: 18, fontWeight: 700,
+                    color: zipInfo.electricityPrice < 11 ? '#22c55e' : zipInfo.electricityPrice < 16 ? '#fbbf24' : zipInfo.electricityPrice < 22 ? '#f97316' : '#ef4444'
+                  }}>
+                    {zipInfo.electricityPrice.toFixed(1)}¢
+                  </div>
+                  <div style={{ fontSize: 12, color: '#9ca3af' }}>/ kWh</div>
+                </div>
+                {zipInfo.electricityPrev !== undefined && (() => {
+                  const delta = zipInfo.electricityPrice! - zipInfo.electricityPrev!
+                  const pct = (delta / zipInfo.electricityPrev!) * 100
+                  return (
+                    <div style={{ fontSize: 11, color: delta > 0.05 ? '#ef4444' : delta < -0.05 ? '#22c55e' : '#9ca3af', marginTop: 2 }}>
+                      {delta > 0.05 ? '↑' : delta < -0.05 ? '↓' : '→'} {delta > 0 ? '+' : ''}{delta.toFixed(1)}¢ ({pct > 0 ? '+' : ''}{pct.toFixed(1)}%) vs prev month
+                    </div>
+                  )
+                })()}
+                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                  {zipInfo.electricityPrice < 11 ? '✓ Below US avg — cost-competitive site'
+                    : zipInfo.electricityPrice < 16 ? '~ Near US avg (13.3¢/kWh)'
+                    : zipInfo.electricityPrice < 22 ? '⚠ Above US avg — SMR economics favorable'
+                    : '⚠ High-cost grid — strong SMR value case'}
+                </div>
+                <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                  EIA state avg • {zipInfo.electricityPrev !== undefined ? 'month-over-month' : '2023 annual'}
+                </div>
               </div>
             )}
             <div style={{ fontSize: 11, color: '#6b7280', marginTop: 8 }}>
