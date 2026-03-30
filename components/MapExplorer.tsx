@@ -10,7 +10,7 @@ interface Props {
   activeLayers: string[]
   searchedZip: { lat: number; lng: number; zip: string; fips?: string } | null
   onSiteSelect: (site: OkloSite | null) => void
-  onZipInfo: (info: { income?: number; unemployment?: number; iso?: string; state?: string }) => void
+  onZipInfo: (info: { income?: number; unemployment?: number; iso?: string; state?: string; electricityPrice?: number }) => void
 }
 
 export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, onZipInfo }: Props) {
@@ -18,73 +18,59 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   const mapRef = useRef<any>(null)
   const layerRefs = useRef<Record<string, any>>({})
   const censusCacheRef = useRef<{ income?: Record<string, number>; unemployment?: Record<string, number> }>({})
+  const electricityDataRef = useRef<Record<string, number>>({})
+
+  const FIPS_TO_ABBR: Record<string, string> = {
+    '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE','11':'DC',
+    '12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA','20':'KS','21':'KY',
+    '22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN','28':'MS','29':'MO','30':'MT',
+    '31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM','36':'NY','37':'NC','38':'ND','39':'OH',
+    '40':'OK','41':'OR','42':'PA','44':'RI','45':'SC','46':'SD','47':'TN','48':'TX','49':'UT',
+    '50':'VT','51':'VA','53':'WA','54':'WV','55':'WI','56':'WY','72':'PR'
+  }
 
   const initMap = useCallback(async () => {
     if (!containerRef.current || mapRef.current) return
     const L = (await import('leaflet')).default
-
-    // Fix Leaflet default icon
     delete (L.Icon.Default.prototype as any)._getIconUrl
     L.Icon.Default.mergeOptions({
       iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
       iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
       shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
     })
-
     const map = L.map(containerRef.current!, {
       center: [39.5, -98.35],
       zoom: 4,
       zoomControl: false,
       attributionControl: true,
     })
-
-    // Dark base tiles
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
       maxZoom: 19,
       subdomains: 'abcd',
     }).addTo(map)
-
     L.control.zoom({ position: 'bottomright' }).addTo(map)
-
     mapRef.current = map
-
-    // Always add Oklo sites layer
     addOkloSites(L, map)
   }, [])
 
   const addOkloSites = (L: any, map: any) => {
     if (layerRefs.current['sites']) { map.removeLayer(layerRefs.current['sites']); }
     const group = L.layerGroup()
-
     OKLO_SITES.forEach(site => {
       const priority = site.priority
       const size = priority >= 4 ? 16 : priority === 3 ? 13 : 10
       const opacity = priority >= 4 ? 1 : priority === 3 ? 0.85 : 0.7
-
       const icon = L.divIcon({
         className: '',
-        html: `<div style="
-          width:${size}px;height:${size}px;
-          background:#f97316;
-          border:2px solid #fff;
-          border-radius:50%;
-          box-shadow:0 0 ${priority >= 4 ? 10 : 6}px rgba(249,115,22,${opacity});
-          opacity:${opacity};
-        "></div>`,
+        html: `<div style="width:${size}px;height:${size}px;background:#f97316;border:2px solid #fff;border-radius:50%;box-shadow:0 0 ${priority >= 4 ? 10 : 6}px rgba(249,115,22,${opacity});opacity:${opacity};"></div>`,
         iconSize: [size, size],
         iconAnchor: [size / 2, size / 2],
         popupAnchor: [0, -size / 2],
       })
-
       const tenants = [site.ntt && 'NTT', site.equinix && 'Equinix', site.vantage && 'Vantage'].filter(Boolean).join(', ')
       const scoreHtml = site.mdScore
-        ? `<div style="margin-top:8px;padding:6px;background:#111827;border-radius:4px;">
-            <div style="font-size:11px;color:#9ca3af;margin-bottom:4px;">MD Ranking Score</div>
-            <div style="font-size:18px;color:#f97316;font-weight:700;">${site.mdScore.total.toFixed(1)}/10</div>
-            <div style="font-size:11px;color:#6b7280;">Confidence: ${Math.round(site.mdScore.confidence * 100)}%</div>
-          </div>` : ''
-
+        ? `<div style="margin-top:8px;padding:6px;background:#111827;border-radius:4px;"><div style="font-size:11px;color:#9ca3af;margin-bottom:4px;">MD Ranking Score</div><div style="font-size:18px;color:#f97316;font-weight:700;">${site.mdScore.total.toFixed(1)}/10</div><div style="font-size:11px;color:#6b7280;">Confidence: ${Math.round(site.mdScore.confidence * 100)}%</div></div>` : ''
       const popup = L.popup({ maxWidth: 280, className: 'oklo-popup' }).setContent(`
         <div style="font-family:system-ui,sans-serif;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
@@ -103,12 +89,10 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           ${scoreHtml}
         </div>
       `)
-
       const marker = L.marker([site.lat, site.lng], { icon }).bindPopup(popup)
       marker.on('click', () => onSiteSelect(site))
       group.addLayer(marker)
     })
-
     group.addTo(map)
     layerRefs.current['sites'] = group
   }
@@ -119,7 +103,6 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       const res = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
       const data = await res.json()
       const states = (topo as any).feature(data, data.objects.states)
-
       const layer = L.geoJSON(states, {
         style: (feature: any) => {
           const fips = feature.id?.toString().padStart(2, '0') || ''
@@ -144,8 +127,6 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       const res = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json')
       const data = await res.json()
       const states = (topo as any).feature(data, data.objects.states)
-
-      // State FIPS -> abbreviation lookup
       const fipsToAbbr: Record<string, string> = {
         '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE','11':'DC',
         '12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA','20':'KS','21':'KY',
@@ -154,7 +135,6 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
         '40':'OK','41':'OR','42':'PA','44':'RI','45':'SC','46':'SD','47':'TN','48':'TX','49':'UT',
         '50':'VT','51':'VA','53':'WA','54':'WV','55':'WI','56':'WY','72':'PR'
       }
-
       const layer = L.geoJSON(states, {
         style: (feature: any) => {
           const fips = feature.id?.toString().padStart(2, '0') || ''
@@ -183,7 +163,6 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   const addChoropleth = async (L: any, map: any, type: 'income' | 'unemployment') => {
     const key = type === 'income' ? 'income' : 'unemployment'
     try {
-      // Load county topojson
       const topoModule = await import('topojson-client')
       const [topoRes, censusRes] = await Promise.all([
         fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json'),
@@ -191,10 +170,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       ])
       const [topoData, censusData] = await Promise.all([topoRes.json(), censusRes.json()])
       if (censusData.error) throw new Error(censusData.error)
-
       censusCacheRef.current[key] = censusData
       const counties = (topoModule as any).feature(topoData, topoData.objects.counties)
-
       const getColor = (value: number) => {
         if (type === 'income') {
           if (value > 90000) return '#1e3a8a'
@@ -212,7 +189,6 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           return '#ecfdf5'
         }
       }
-
       const layer = L.geoJSON(counties, {
         style: (feature: any) => {
           const fips = feature.id?.toString().padStart(5, '0') || ''
@@ -247,10 +223,7 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
         color: '#fff', weight: 1, opacity: 0.8
       })
       circle.bindTooltip(
-        `<b>${plant.name}</b><br>${plant.city}, ${plant.state}<br>
-        Capacity: ${plant.capacityMW.toLocaleString()} MW<br>
-        Status: <span style="color:${color}">${plant.status.toUpperCase()}${plant.retirementYear ? ` (${plant.retirementYear})` : ''}</span><br>
-        ${plant.owner ? `Owner: ${plant.owner}` : ''}`,
+        `<b>${plant.name}</b><br>${plant.city}, ${plant.state}<br>Capacity: ${plant.capacityMW.toLocaleString()} MW<br>Status: <span style="color:${color}">${plant.status.toUpperCase()}${plant.retirementYear ? ` (${plant.retirementYear})` : ''}</span><br>${plant.owner ? `Owner: ${plant.owner}` : ''}`,
         { sticky: true }
       )
       group.addLayer(circle)
@@ -264,20 +237,11 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
     SUBSTATIONS.forEach(sub => {
       const icon = L.divIcon({
         className: '',
-        html: `<div style="
-          width:10px;height:10px;
-          background:#f59e0b;
-          border:1.5px solid #fff;
-          transform:rotate(45deg);
-          box-shadow:0 0 6px rgba(245,158,11,0.8);
-        "></div>`,
+        html: `<div style="width:10px;height:10px;background:#f59e0b;border:1.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 6px rgba(245,158,11,0.8);"></div>`,
         iconSize: [10, 10], iconAnchor: [5, 5], popupAnchor: [0, -8],
       })
       const marker = L.marker([sub.lat, sub.lng], { icon })
-      marker.bindTooltip(
-        `<b>${sub.name}</b><br>${sub.state} | ${sub.voltageKV}kV | ${sub.iso}`,
-        { sticky: true }
-      )
+      marker.bindTooltip(`<b>${sub.name}</b><br>${sub.state} | ${sub.voltageKV}kV | ${sub.iso}`, { sticky: true })
       group.addLayer(marker)
     })
     group.addTo(map)
@@ -285,8 +249,6 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   }
 
   const addGovLandLayer = async (L: any, map: any) => {
-    // Simplified federal land polygons — major DOE/DOD/BLM areas relevant to nuclear siting
-    // Using approximate bounding boxes for key sites
     const fedLandAreas = [
       { name: 'Idaho National Lab', coords: [[43.2, -113.5], [44.0, -113.5], [44.0, -112.0], [43.2, -112.0]] },
       { name: 'Savannah River Site', coords: [[33.2, -82.0], [33.6, -82.0], [33.6, -81.3], [33.2, -81.3]] },
@@ -311,21 +273,69 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
     layerRefs.current['govland'] = group
   }
 
-  // Initialize map once
+  const addElectricityLayer = async (L: any, map: any) => {
+    try {
+      const [topoModule, topoRes, priceRes] = await Promise.all([
+        import('topojson-client'),
+        fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json'),
+        fetch('/api/electricity-prices')
+      ])
+      const [topoData, priceJson] = await Promise.all([topoRes.json(), priceRes.json()])
+      const priceData: Record<string, number> = priceJson.data || {}
+      electricityDataRef.current = priceData
+      const states = (topoModule as any).feature(topoData, topoData.objects.states)
+      const getColor = (price: number) => {
+        if (price < 9)  return '#166534'
+        if (price < 11) return '#22c55e'
+        if (price < 13) return '#84cc16'
+        if (price < 16) return '#fbbf24'
+        if (price < 20) return '#f97316'
+        if (price < 26) return '#ef4444'
+        return '#7f1d1d'
+      }
+      const layer = L.geoJSON(states, {
+        style: (feature: any) => {
+          const fips = feature.id?.toString().padStart(2, '0') || ''
+          const abbr = FIPS_TO_ABBR[fips] || ''
+          const price = priceData[abbr]
+          if (!price) return { fillColor: '#374151', fillOpacity: 0.3, color: '#4b5563', weight: 1 }
+          return { fillColor: getColor(price), fillOpacity: 0.65, color: '#111827', weight: 1, opacity: 0.8 }
+        },
+        onEachFeature: (feature: any, layer: any) => {
+          const fips = feature.id?.toString().padStart(2, '0') || ''
+          const abbr = FIPS_TO_ABBR[fips] || ''
+          const price = priceData[abbr]
+          const label = price
+            ? `<b>${abbr}</b><br>⚡ ${price.toFixed(1)}¢/kWh avg retail<br><span style="font-size:11px;color:#9ca3af">${price < 11 ? '✓ Low cost' : price < 16 ? '~ US avg' : price < 22 ? '↑ Above avg' : '⚠ High cost'}</span>`
+            : `<b>${abbr}</b><br>No data`
+          layer.bindTooltip(label, { sticky: true })
+        }
+      })
+      layer.addTo(map)
+      layerRefs.current['electricity'] = layer
+      const legend = (L.control as any)({ position: 'bottomleft' })
+      legend.onAdd = () => {
+        const div = L.DomUtil.create('div')
+        div.style.cssText = 'background:rgba(17,24,39,0.92);padding:8px 10px;border-radius:8px;border:1px solid #374151;font-size:11px;color:#e2e8f0;'
+        div.innerHTML = `<div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">Retail Price (¢/kWh)</div>${[['#166534','< 9¢'],['#22c55e','9–11¢'],['#84cc16','11–13¢'],['#fbbf24','13–16¢'],['#f97316','16–20¢'],['#ef4444','20–26¢'],['#7f1d1d','> 26¢']].map(([c,l]) => `<div style="display:flex;align-items:center;gap:5px;margin:2px 0"><div style="width:12px;height:12px;background:${c};border-radius:2px;flex-shrink:0"></div>${l}</div>`).join('')}`
+        return div
+      }
+      legend.addTo(map)
+      layerRefs.current['electricity-legend'] = legend
+    } catch (e) { console.error('Electricity layer error:', e) }
+  }
+
   useEffect(() => { initMap() }, [initMap])
 
-  // Toggle layers based on activeLayers
   useEffect(() => {
     if (!mapRef.current) return
     const map = mapRef.current
-
     const toggleLayer = async (id: string, active: boolean) => {
       if (!active) {
         if (layerRefs.current[id]) { map.removeLayer(layerRefs.current[id]); delete layerRefs.current[id] }
         return
       }
-      if (layerRefs.current[id]) return // already on
-
+      if (layerRefs.current[id]) return
       const L = (await import('leaflet')).default
       switch (id) {
         case 'iso': await addISOLayer(L, map); break
@@ -335,28 +345,29 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
         case 'substations': addSubstationsLayer(L, map); break
         case 'govland': await addGovLandLayer(L, map); break
         case 'nuclear': await addNuclearLayer(L, map); break
+        case 'electricity': await addElectricityLayer(L, map); break
         case 'sites':
           if (!layerRefs.current['sites']) { addOkloSites(L, map) }
           break
       }
     }
-
-    const allIds = ['iso', 'income', 'unemployment', 'coal', 'substations', 'govland', 'nuclear', 'sites']
+    const handleElectricityOff = (active: boolean) => {
+      if (!active && layerRefs.current['electricity-legend']) {
+        mapRef.current?.removeControl(layerRefs.current['electricity-legend'])
+        delete layerRefs.current['electricity-legend']
+      }
+    }
+    if (!activeLayers.includes('electricity')) handleElectricityOff(false)
+    const allIds = ['iso', 'income', 'unemployment', 'coal', 'substations', 'govland', 'nuclear', 'electricity', 'sites']
     allIds.forEach(id => toggleLayer(id, activeLayers.includes(id)))
   }, [activeLayers])
 
-  // Handle zip code search
   useEffect(() => {
     if (!searchedZip || !mapRef.current) return
     const map = mapRef.current
-
     import('leaflet').then(({ default: L }) => {
-      // Remove previous zip highlight
       if (layerRefs.current['zipHighlight']) { map.removeLayer(layerRefs.current['zipHighlight']) }
-
       map.flyTo([searchedZip.lat, searchedZip.lng], 10, { animate: true, duration: 1.5 })
-
-      // Add a pulsing circle at the zip centroid
       const circle = L.circle([searchedZip.lat, searchedZip.lng], {
         radius: 8000,
         fillColor: '#f97316', fillOpacity: 0.15,
@@ -365,14 +376,29 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
       circle.addTo(map)
       circle.bindPopup(`<b>ZIP: ${searchedZip.zip}</b><br>Lat: ${searchedZip.lat.toFixed(4)}, Lng: ${searchedZip.lng.toFixed(4)}`).openPopup()
       layerRefs.current['zipHighlight'] = circle
-
-      // Look up cached census data if available
       const fips = searchedZip.fips
-      if (fips) {
-        const income = censusCacheRef.current.income?.[fips]
-        const unemployment = censusCacheRef.current.unemployment?.[fips]
-        onZipInfo({ income, unemployment, state: fips.substring(0, 2) })
+      const stateFips = fips ? fips.substring(0, 2) : ''
+      const stateAbbr = FIPS_TO_ABBR[stateFips] || ''
+      const getElectricityPrice = async () => {
+        if (electricityDataRef.current[stateAbbr] !== undefined) {
+          return electricityDataRef.current[stateAbbr]
+        }
+        try {
+          const r = await fetch('/api/electricity-prices')
+          const json = await r.json()
+          electricityDataRef.current = json.data || {}
+          return electricityDataRef.current[stateAbbr]
+        } catch { return undefined }
       }
+      getElectricityPrice().then(electricityPrice => {
+        if (fips) {
+          const income = censusCacheRef.current.income?.[fips]
+          const unemployment = censusCacheRef.current.unemployment?.[fips]
+          onZipInfo({ income, unemployment, state: stateFips, electricityPrice })
+        } else if (stateAbbr) {
+          onZipInfo({ electricityPrice, state: stateFips })
+        }
+      })
     })
   }, [searchedZip])
 
