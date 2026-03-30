@@ -81,14 +81,15 @@ export interface LayerConfig {
 }
 
 export const MAP_LAYERS: LayerConfig[] = [
-  { id: 'iso', label: 'ISO/RTO Regions', color: '#8b5cf6', icon: '⚡', description: 'Electricity market boundaries' },
-  { id: 'income', label: 'Median Income', color: '#3b82f6', icon: '💰', description: 'Median household income by county (Census ACS)' },
-  { id: 'unemployment', label: 'Unemployment Rate', color: '#10b981', icon: '👷', description: 'Unemployment rate by county (Census ACS)' },
-  { id: 'coal', label: 'Coal Plant Shutdowns', color: '#ef4444', icon: '🏭', description: 'Major coal power plants — operating, retiring, retired' },
-  { id: 'substations', label: 'Major Substations', color: '#f59e0b', icon: '🔌', description: '345kV+ transmission substations' },
-  { id: 'govland', label: 'Federal Land', color: '#22c55e', icon: '🏛️', description: 'Federal government owned land (BLM, USFS, DOE, DOD)' },
-  { id: 'nuclear', label: 'Nuclear-Friendly States', color: '#06b6d4', icon: '⚛️', description: 'States with no nuclear moratoriums / active SMR interest' },
-  { id: 'sites', label: 'Oklo Sites', color: '#f97316', icon: '📍', description: 'Oklo candidate and active sites' },
+  { id: 'iso', label: 'ISO/RTO Regions', color: '#8b5cf6', icon: '\u26a1', description: 'Electricity market boundaries' },
+  { id: 'income', label: 'Median Income', color: '#3b82f6', icon: '\ud83d\udcb0', description: 'Median household income by county (Census ACS)' },
+  { id: 'unemployment', label: 'Unemployment Rate', color: '#10b981', icon: '\ud83d\udc77', description: 'Unemployment rate by county (Census ACS)' },
+  { id: 'coal', label: 'Coal Plant Shutdowns', color: '#ef4444', icon: '\ud83c\udfed', description: 'Major coal power plants \u2014 operating, retiring, retired' },
+  { id: 'substations', label: 'Major Substations', color: '#f59e0b', icon: '\ud83d\udd0c', description: '345kV+ transmission substations' },
+  { id: 'govland', label: 'Federal Land', color: '#22c55e', icon: '\ud83c\udfd7\ufe0f', description: 'Federal government owned land (BLM, USFS, DOE, DOD)' },
+  { id: 'nuclear', label: 'Nuclear-Friendly States', color: '#06b6d4', icon: '\u269b\ufe0f', description: 'States with no nuclear moratoriums / active SMR interest' },
+  { id: 'electricity', label: 'Electricity Prices', color: '#fbbf24', icon: '\u26a1', description: 'Average retail electricity price by state (\u00a2/kWh) \u2014 EIA data' },
+  { id: 'sites', label: 'Oklo Sites', color: '#f97316', icon: '\ud83d\udccd', description: 'Oklo candidate and active sites' },
 ]
 
 export const ISO_COLORS: Record<string, string> = {
