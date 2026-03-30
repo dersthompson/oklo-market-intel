@@ -1,46 +1,55 @@
 import { NextResponse } from 'next/server'
 
-// Geocode a ZIP code using OpenStreetMap Nominatim (free, no key)
-// Then fetch county FIPS from Census Tiger Geocoder
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url)
   const zip = searchParams.get('zip')
-
-  if (!zip || !/zip is not '' defined/test(zip)) {
-    return NextResponse.json({ error: 'Invalid ZIP code' }, { status: 400 })
+  if (!zip || !/^\d{5}$/.test(zip)) {
+    return NextResponse.json({ error: 'Invalid zip code' }, { status: 400 })
   }
 
   try {
-    // Step 1: Geocode via Nominatim
-    const nominatimUrl = `https://nominatim.openstreetmap.org/search?postcode=${zip}&countrycodes=us&format=json&limit=1`
-    const nominatimRes = await fetch(nominatimUrl, {
-      headers: { 'User-Agent': 'OkloMarketIntel/1.0' }
+    // Use Nominatim (OpenStreetMap) geocoder — free, no key required
+    const url = `https://nominatim.openstreetmap.org/search?postalcode=${zip}&country=US&format=json&limit=1&addressdetails=1`
+    const res = await fetch(url, {
+      headers: { 'User-Agent': 'Oklo-Market-Intelligence/1.0' },
+      next: { revalidate: 86400 }
     })
-    const nominatimData = await nominatimRes.json()
+    if (!res.ok) throw new Error('Geocoding failed')
+    const data = await res.json()
+    if (!data.length) return NextResponse.json({ error: 'ZIP not found' }, { status: 404 })
 
-    if (!nominatimData[0]) {
-      return NextResponse.json({ error: 'ZIP code not found' }, { status: 404 })
-    }
+    const loc = data[0]
+    const lat = parseFloat(loc.lat)
+    const lng = parseFloat(loc.lon)
+    const stateName = loc.address?.state || ''
+    const stateCode = stateNameToCode(stateName)
 
-    const { lat, lon, display_name } = nominatimData[0]
+    // Fetch county FIPS from Census geocoder for income/unemployment data
+    let fips = ''
+    try {
+      const censusUrl = `https://geocoding.geo.census.gov/geocoder/geographies/coordinates?x=${lng}&y=${lat}&benchmark=Public_AR_Current&vintage=Current_Current&layers=Counties&format=json`
+      const censusRes = await fetch(censusUrl, { next: { revalidate: 86400 } })
+      const censusData = await censusRes.json()
+      const county = censusData?.result?.geographies?.Counties?.[0]
+      if (county) fips = county.STATE + county.COUNTY
+    } catch {}
 
-    // Step 2: Get county FIPS from Census Tiger Geocoder
-    const tigerUrl = `https://geocoding.geo.census.gov/geocoder/geographies?benchmark=PublicAddressRangeBenchmark&geohierarchy=GeographyCoreBasedStatisticalAreaHierarchy&x_ss=${lon}&y__ss=${lat}&format=json`
-    const tigerRes = await fetch(tigerUrl)
-    const tigerData = await tigerRes.json()
-
-    const county = tigerData.result?.geographies?.Counties?.[0]
-    const fips = county ? county.STATE + county.COUNTY : null
-
-    return NextResponse.json({
-      lat: parseFloat(lat),
-      lng: parseFloat(lon),
-      zip,
-      state: county?.STATE,
-      displayName: display_name,
-      fips
-    })
+    return NextResponse.json({ lat, lng, zip, state: stateCode, displayName: loc.display_name, fips })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
+
+const stateMap: Record<string, string> = {
+  'Alabama':'AL','Alaska':'AK','Arizona':'AZ','Arkansas':'AR','California':'CA',
+  'Colorado':'CO','Connecticut':'CT','Delaware':'DE','Florida':'FL','Georgia':'GA',
+  'Hawaii':'HI','Idaho':'ID','Illinois':'IL','Indiana':'IN','Iowa':'IA','Kansas':'KS',
+  'Kentucky':'KY','Louisiana':'LA','Maine':'ME','Maryland':'MD','Massachusetts':'MA',
+  'Michigan':'MI','Minnesota':'MN','Mississippi':'MS','Missouri':'MO','Montana':'MT',
+  'Nebraska':'NE','Nevada':'NV','New Hampshire':'NH','New Jersey':'NJ','New Mexico':'NM',
+  'New York':'NY','North Carolina':'NC','North Dakota':'ND','Ohio':'OH','Oklahoma':'OK',
+  'Oregon':'OR','Pennsylvania':'PA','Rhode Island':'RI','South Carolina':'SC','South Dakota':'SD',
+  'Tennessee':'TN','Texas':'TX','Utah':'UT','Vermont':'VT','Virginia':'VA','Washington':'WA',
+  'West Virginia':'WV','Wisconsin':'WI','Wyoming':'WY','District of Columbia':'DC'
+}
+function stateNameToCode(name: string) { return stateMap[name] || name }
