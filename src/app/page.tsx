@@ -1,137 +1,188 @@
-"use client";
+'use client'
+import { useState, useCallback } from 'react'
+import dynamic from 'next/dynamic'
+import LayerPanel from '@/components/LayerPanel'
+import ZipSearch from '@/components/ZipSearch'
+import SitePanel from '@/components/SitePanel'
+import UtilityTab from '@/components/UtilityTab'
+import InternationalTab from '@/components/InternationalTab'
+import type { OkloSite } from '@/lib/types'
+import { ISO_COLORS } from '@/lib/types'
+import { Map, Building2, Globe, Atom } from 'lucide-react'
 
-import { useState, useMemo, useCallback } from "react";
-import dynamic from "next/dynamic";
-import type { Country, ScoredCountry, WeightConfig } from "@/lib/types";
-import { DEFAULT_WEIGHTS } from "@/lib/types";
-import { scoreCountries, computeWeightedScore } from "@/lib/scoring";
-import { FilterPanel } from "@/components/FilterPanel";
-import { CountryHoverCard } from "@/components/CountryHoverCard";
-import countriesRaw from "../../data/countries.json";
+const MapExplorer = dynamic(() => import('@/components/MapExplorer'), {
+  ssr: false,
+  loading: () => (
+    <div style={{
+      width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: '#0a0a1a', flexDirection: 'column', gap: 16
+    }}>
+      <div style={{ width: 40, height: 40, border: '3px solid #374151', borderTopColor: '#f97316', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+      <span style={{ color: '#6b7280', fontSize: 14 }}>Loading map...</span>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
+})
 
-const WorldMap = dynamic(
-  () => import("@/components/WorldMap").then((m) => m.WorldMap),
-  { ssr: false, loading: () => <div className="w-full h-full bg-[#1a1a2e] rounded-xl animate-pulse" /> }
-);
+type Tab = 'map' | 'utilities' | 'international'
 
-interface FilterState {
-  minScore: number;
-  regions: Set<string>;
-  statuses: Set<string>;
-  saleStrategies: Set<string>;
-  carbonTargets: Set<string>;
-  requireNuclearFramework: boolean;
-  requireDeregulated: boolean;
-}
+export default function Home() {
+  const [activeTab, setActiveTab] = useState<Tab>('map')
+  const [activeLayers, setActiveLayers] = useState<string[]>(['sites', 'iso'])
+  const [loadingLayers, setLoadingLayers] = useState<string[]>([])
+  const [selectedSite, setSelectedSite] = useState<OkloSite | null>(null)
+  const [searchedZip, setSearchedZip] = useState<{ lat: number; lng: number; zip: string; fips?: string } | null>(null)
+  const [zipInfo, setZipInfo] = useState<{ income?: number; unemployment?: number; iso?: string; electricityPrice?: number; electricityPrev?: number } | null>(null)
 
-const DEFAULT_FILTERS: FilterState = {
-  minScore: 0,
-  regions: new Set(["EU", "SE_ASIA"]),
-  statuses: new Set(["FOCUS", "TRACK", "SHELVE"]),
-  saleStrategies: new Set(["ELECTRONS", "JV", "BOTH"]),
-  carbonTargets: new Set(["2030", "2040", "2050", "None"]),
-  requireNuclearFramework: false,
-  requireDeregulated: false,
-};
+  const toggleLayer = useCallback((id: string) => {
+    setActiveLayers(prev => {
+      const next = prev.includes(id) ? prev.filter(l => l !== id) : [...prev, id]
+      if (!prev.includes(id)) {
+        setLoadingLayers(l => [...l, id])
+        setTimeout(() => setLoadingLayers(l => l.filter(x => x !== id)), 3000)
+      }
+      return next
+    })
+  }, [])
 
-const allCountries = countriesRaw as Country[];
+  const handleSiteSelect = useCallback((site: OkloSite | null) => {
+    setSelectedSite(site)
+    setSearchedZip(null)
+    setZipInfo(null)
+  }, [])
 
-export default function MapPage() {
-  const [weights, setWeights] = useState<WeightConfig>(DEFAULT_WEIGHTS);
-  const [filters, setFilters] = useState<FilterState>(DEFAULT_FILTERS);
-  const [hoveredCode, setHoveredCode] = useState<string | null>(null);
-  const [search, setSearch] = useState("");
+  const handleZipResult = useCallback((data: any) => {
+    if (!data) { setSearchedZip(null); setZipInfo(null); return }
+    setSearchedZip(data)
+    setSelectedSite(null)
+    setZipInfo(null)
+  }, [])
 
-  const scoredCountries: ScoredCountry[] = useMemo(
-    () => scoreCountries(allCountries, weights),
-    [weights]
-  );
-
-  const activeFilters = useMemo(() => {
-    const passing = new Set<string>();
-    for (const c of scoredCountries) {
-      const score = computeWeightedScore(c, weights);
-      if (score < filters.minScore) continue;
-      if (!filters.regions.has(c.region)) continue;
-      if (!filters.statuses.has(c.status)) continue;
-      if (!filters.saleStrategies.has(c.saleStrategy)) continue;
-      if (!filters.carbonTargets.has(c.carbonTarget)) continue;
-      if (filters.requireNuclearFramework && c.nuclearFrameworkScore < 4) continue;
-      if (filters.requireDeregulated && c.marketDeregScore < 5) continue;
-      passing.add(c.code);
-    }
-    return passing;
-  }, [scoredCountries, weights, filters]);
-
-  const hoveredCountry = useMemo(
-    () => hoveredCode ? scoredCountries.find((c) => c.code === hoveredCode) ?? null : null,
-    [hoveredCode, scoredCountries]
-  );
-
-  const sidebarCountries = useMemo(() => {
-    const q = search.toLowerCase().trim();
-    return scoredCountries
-      .filter((c) => activeFilters.has(c.code))
-      .filter((c) => !q || c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
-  }, [scoredCountries, activeFilters, search]);
-
-  const handleHover = useCallback((code: string | null) => { setHoveredCode(code); }, []);
+  const handleZipInfo = useCallback((info: any) => setZipInfo(info), [])
 
   return (
-    <div className="flex h-[calc(100vh-53px)] overflow-hidden">
-      <FilterPanel filters={filters} weights={weights} onFilterChange={setFilters} onWeightChange={setWeights} qualifyingCount={activeFilters.size} totalCount={scoredCountries.length} />
-      <div className="flex-1 relative overflow-hidden">
-        <WorldMap countries={scoredCountries} weights={weights} activeFilters={activeFilters} onCountryHover={handleHover} />
-        {hoveredCountry && activeFilters.has(hoveredCountry.code) && <CountryHoverCard country={hoveredCountry} />}
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 bg-[var(--card)]/90 backdrop-blur-sm border border-[var(--card-border)] rounded-full px-4 py-1.5 flex items-center gap-4 z-[9999] text-[11px]">
-          <span className="font-semibold text-[var(--foreground)]">Score:</span>
-          {[
-            { color: "#991b1b", label: "< 25" },
-            { color: "#ca8a04", label: "25-45" },
-            { color: "#65a30d", label: "45-55" },
-            { color: "#16a34a", label: "55-70" },
-            { color: "#15803d", label: "70+" },
-            { color: "#94a3b8", label: "Filtered" },
-          ].map(({ color, label }) => (
-            <span key={label} className="flex items-center gap-1">
-              <span className="w-3 h-3 rounded-sm inline-block" style={{ background: color }} />
-              <span className="text-[var(--muted)]">{label}</span>
-            </span>
+    <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', background: '#0a0a1a', overflow: 'hidden' }}>
+      {/* Top Nav */}
+      <header style={{
+        height: 56, background: '#111827', borderBottom: '1px solid #1f2937',
+        display: 'flex', alignItems: 'center', padding: '0 20px', gap: 20,
+        flexShrink: 0, zIndex: 1100, position: 'relative'
+      }}>
+        {/* Logo */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginRight: 12 }}>
+          <div style={{
+            width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg, #f97316, #ea580c)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center'
+          }}>
+            <Atom size={18} color="#fff" />
+          </div>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: '#e2e8f0', lineHeight: 1 }}>Oklo</div>
+            <div style={{ fontSize: 10, color: '#6b7280', lineHeight: 1, marginTop: 1 }}>Market Intelligence</div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div style={{ display: 'flex', gap: 4, background: '#1f2937', borderRadius: 10, padding: 4 }}>
+          {([
+            { id: 'map', label: 'US Market', icon: Map },
+            { id: 'utilities', label: 'Utility Companies', icon: Building2 },
+            { id: 'international', label: 'International', icon: Globe },
+          ] as { id: Tab; label: string; icon: any }[]).map(({ id, label, icon: Icon }) => (
+            <button key={id} onClick={() => setActiveTab(id)} style={{
+              display: 'flex', alignItems: 'center', gap: 6,
+              padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer',
+              background: activeTab === id ? '#374151' : 'transparent',
+              color: activeTab === id ? '#e2e8f0' : '#9ca3af',
+              fontSize: 13, fontWeight: activeTab === id ? 600 : 400, transition: 'all 0.15s'
+            }}>
+              <Icon size={14} />
+              {label}
+            </button>
           ))}
         </div>
-      </div>
-      <aside className="w-64 shrink-0 flex flex-col border-l border-[var(--card-border)] bg-[var(--card)] overflow-hidden">
-        <div className="px-3 py-3 border-b border-[var(--card-border)]">
-          <input type="text" placeholder="Search countries..." value={search} onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[var(--background)] border border-[var(--card-border)] rounded-lg px-3 py-1.5 text-xs placeholder:text-[var(--muted)] focus:outline-none focus:ring-1 focus:ring-[var(--accent)]" />
-          <p className="text-[10px] text-[var(--muted)] mt-1.5">{sidebarCountries.length} qualifying</p>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {sidebarCountries.map((c) => {
-            const scoreClass = c.weightedScore >= 65 ? "score-high" : c.weightedScore >= 45 ? "score-mid" : "score-low";
-            return (
-              <a key={c.code} href={`/country/${c.code}`}
-                className="flex items-center justify-between px-3 py-2.5 border-b border-[var(--card-border)] hover:bg-[var(--accent-light)] transition-colors group">
-                <div className="min-w-0">
-                  <div className="text-xs font-semibold text-[var(--foreground)] truncate group-hover:text-[var(--accent)]">{c.name}</div>
-                  <div className="text-[10px] text-[var(--muted)] mt-0.5">
-                    {c.region === "EU" ? "Europe" : "SE Asia"} · {c.saleStrategy === "ELECTRONS" ? "Electrons" : c.saleStrategy === "JV" ? "JV" : "Both"}
-                  </div>
-                </div>
-                <span className={`text-[11px] font-bold px-1.5 py-0.5 rounded ml-2 shrink-0 ${scoreClass}`}>{c.weightedScore}</span>
-              </a>
-            );
-          })}
-          {sidebarCountries.length === 0 && (
-            <div className="px-4 py-8 text-center text-xs text-[var(--muted)]">No countries match current filters</div>
+
+        {/* International badge */}
+        {activeTab === 'international' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <div style={{ padding: '4px 10px', background: '#8b5cf620', border: '1px solid #8b5cf640', borderRadius: 8, fontSize: 11, color: '#8b5cf6', fontWeight: 600 }}>
+              {30} Markets Tracked
+            </div>
+          </div>
+        )}
+
+        {/* ISO legend (map only) */}
+        {activeTab === 'map' && (
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: 10, color: '#6b7280', marginRight: 4 }}>ISOs:</span>
+            {Object.entries(ISO_COLORS).filter(([k]) => k !== 'Non-ISO').map(([iso, color]) => (
+              <div key={iso} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: color }} />
+                <span style={{ fontSize: 10, color: '#9ca3af' }}>{iso}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Site count badge */}
+        {activeTab === 'map' && (
+          <div style={{
+            padding: '4px 10px', background: '#f9731620', border: '1px solid #f9731640',
+            borderRadius: 8, fontSize: 11, color: '#f97316', fontWeight: 600, flexShrink: 0
+          }}>
+            26 Sites
+          </div>
+        )}
+      </header>
+
+      {/* Main Content */}
+      <div style={{ flex: 1, position: 'relative', overflow: 'hidden' }}>
+        {/* MAP TAB */}
+        <div style={{ display: activeTab === 'map' ? 'block' : 'none', position: 'absolute', inset: 0 }}>
+          <MapExplorer
+            activeLayers={activeLayers}
+            searchedZip={searchedZip}
+            onSiteSelect={handleSiteSelect}
+            onZipInfo={handleZipInfo}
+          />
+          <LayerPanel activeLayers={activeLayers} onToggle={toggleLayer} loading={loadingLayers} />
+          <ZipSearch onResult={handleZipResult} />
+          {(selectedSite || zipInfo || searchedZip) && (
+            <SitePanel
+              site={selectedSite}
+              zipInfo={zipInfo}
+              searchedZip={searchedZip?.zip || null}
+              onClose={() => { setSelectedSite(null); setZipInfo(null); setSearchedZip(null) }}
+            />
+          )}
+
+          {/* Map instructions */}
+          {!selectedSite && !searchedZip && (
+            <div style={{
+              position: 'absolute', top: 80, right: 16, zIndex: 999,
+              background: 'rgba(17,24,39,0.9)', borderRadius: 10,
+              border: '1px solid #374151', padding: '10px 14px', maxWidth: 200
+            }}>
+              <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>
+                <div style={{ fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>Quick Start</div>
+                Toggle layers on the left<br />
+                Click any orange pin to view site details<br />
+                Enter a ZIP code below to analyze any US area
+              </div>
+            </div>
           )}
         </div>
-        <div className="px-3 py-3 border-t border-[var(--card-border)]">
-          <a href="/pipeline" className="block w-full text-center text-xs font-semibold bg-[var(--accent)] text-white rounded-lg py-2 hover:opacity-90 transition-opacity">
-            View Pipeline
-          </a>
+
+        {/* UTILITIES TAB */}
+        <div style={{ display: activeTab === 'utilities' ? 'block' : 'none', position: 'absolute', inset: 0, overflowY: 'auto' }}>
+          <UtilityTab />
         </div>
-      </aside>
+
+        {/* INTERNATIONAL TAB */}
+        <div style={{ display: activeTab === 'international' ? 'flex' : 'none', position: 'absolute', inset: 0 }}>
+          <InternationalTab />
+        </div>
+      </div>
     </div>
-  );
+  )
 }
