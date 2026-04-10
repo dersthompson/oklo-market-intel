@@ -19,9 +19,7 @@ const PriorityBadge = ({ p }: { p: number }) => {
     <span style={{
       padding: '2px 10px', borderRadius: 12, fontSize: 11, fontWeight: 700,
       background: bg, color: fg, border: `1px solid ${fg}40`
-    }}>
-      P{p} Priority
-    </span>
+    }}>P{p} Priority</span>
   )
 }
 
@@ -83,6 +81,7 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
               </div>
             </div>
 
+            {/* Data center interest */}
             {(site.ntt || site.equinix || site.vantage) && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>DC Tenant Interest</div>
@@ -94,6 +93,7 @@ export default function SitePanel({ site, zipInfo, searchedZip, onClose }: Props
               </div>
             )}
 
+            {/* MD Ranking Score */}
             {site.mdScore && (
               <div style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: 10, color: '#6b7280', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.05em' }}>MD Ranking Score</div>
