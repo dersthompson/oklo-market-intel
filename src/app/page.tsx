@@ -165,9 +165,9 @@ export default function Home() {
             }}>
               <div style={{ fontSize: 11, color: '#9ca3af', lineHeight: 1.6 }}>
                 <div style={{ fontWeight: 600, color: '#e2e8f0', marginBottom: 4 }}>Quick Start</div>
-                Toggle layers on the left<br />
-                Click any orange pin to view site details<br />
-                Enter a ZIP code below to analyze any US area
+                • Toggle layers on the left<br />
+                • Click any orange pin to view site details<br />
+                • Enter a ZIP code below to analyze any US area
               </div>
             </div>
           )}
