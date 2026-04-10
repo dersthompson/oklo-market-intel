@@ -58,7 +58,7 @@ export function computeWeightedScore(c: CountryScore, w: ScoreWeights): number {
 }
 
 export const COUNTRIES: CountryScore[] = [
-  // ─── EUROPE ────────────────────────────────────────────────────────────────────────────
+  // ─── EUROPE ─────────────────────────────────────────────────────────────────
   {
     id: 'GB', name: 'United Kingdom', region: 'europe', subregion: 'Western Europe', flagEmoji: '🇬🇧',
     energyPrice: 8.5, carbonCommitment: 8.0, nuclearFramework: 8.5, marketDeregulation: 7.5,
@@ -78,7 +78,7 @@ export const COUNTRIES: CountryScore[] = [
     energyPrice: 9.0, carbonCommitment: 7.0, nuclearFramework: 5.5, marketDeregulation: 6.5,
     partnerEcosystem: 9.0, licensingClarity: 5.5, geopoliticalSafety: 8.5, financingSupport: 7.0,
     notes: 'Pivoting from coal to nuclear, partnered with US (Westinghouse AP1000 at Choczewo). Strong NATO ally, major US partnership opportunity. Building regulatory framework from scratch.',
-    keySignals: ['Westinghouse selected for first nuclear plant', 'US Export-Import-Import Bank support', 'Energy security driving nuclear push'],
+    keySignals: ['Westinghouse selected for first nuclear plant', 'US Export-Import Bank support', 'Energy security driving nuclear push'],
   },
   {
     id: 'CZ', name: 'Czech Republic', region: 'europe', subregion: 'Central & Eastern Europe', flagEmoji: '🇨🇿',
@@ -144,7 +144,7 @@ export const COUNTRIES: CountryScore[] = [
     keySignals: ['Westinghouse expanding Ukrainian supply', 'Post-war reconstruction planning underway'],
   },
 
-  // ─── ASIA PACIFIC ────────────────────────────────────────────────────────────────────────────
+  // ─── ASIA PACIFIC ────────────────────────────────────────────────────────────
   {
     id: 'KR', name: 'South Korea', region: 'asia_pacific', subregion: 'East Asia', flagEmoji: '🇰🇷',
     energyPrice: 6.5, carbonCommitment: 8.0, nuclearFramework: 9.5, marketDeregulation: 5.5,
@@ -216,7 +216,7 @@ export const COUNTRIES: CountryScore[] = [
     keySignals: ['National Energy Policy includes nuclear', 'IAEA training program active', 'ThorCon molten salt reactor discussions'],
   },
 
-  // ─── MIDDLE EAST ────────────────────────────────────────────────────────────────────────────
+  // ─── MIDDLE EAST ─────────────────────────────────────────────────────────────
   {
     id: 'AE', name: 'UAE', region: 'middle_east', subregion: 'Gulf', flagEmoji: '🇦🇪',
     energyPrice: 5.0, carbonCommitment: 7.5, nuclearFramework: 8.5, marketDeregulation: 7.0,
@@ -239,7 +239,7 @@ export const COUNTRIES: CountryScore[] = [
     keySignals: ['123 Agreement with US signed', 'JAEC Jordan Research Reactor operating', 'National nuclear program milestones met'],
   },
 
-  // ─── AMERICAS ────────────────────────────────────────────────────────────────────────────
+  // ─── AMERICAS ────────────────────────────────────────────────────────────────
   {
     id: 'CA', name: 'Canada', region: 'americas', subregion: 'North America', flagEmoji: '🇨🇦',
     energyPrice: 7.0, carbonCommitment: 9.0, nuclearFramework: 9.5, marketDeregulation: 7.0,
@@ -255,7 +255,7 @@ export const COUNTRIES: CountryScore[] = [
     keySignals: ['Angra 3 completion restarted', 'Naval nuclear submarine program', 'CNEN licensing reform discussions'],
   },
 
-  // ─── AFRICA ──────────────────────────────────────────────────────────────────────────────
+  // ─── AFRICA ──────────────────────────────────────────────────────────────────
   {
     id: 'ZA', name: 'South Africa', region: 'africa', subregion: 'Southern Africa', flagEmoji: '🇿🇦',
     energyPrice: 7.0, carbonCommitment: 7.5, nuclearFramework: 8.0, marketDeregulation: 5.5,
