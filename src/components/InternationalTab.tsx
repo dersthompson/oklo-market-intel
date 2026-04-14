@@ -6,7 +6,7 @@ import {
   type CountryScore, type ScoreWeights
 } from '@/lib/international'
 
-// ── Simple SVG world map using approximate bounding boxes ────────────────────────────────────────────────
+// ── Simple SVG world map using approximate bounding boxes ──────────────────────
 // We use a projection-friendly SVG with d3-compatible positioning
 // Countries are mapped to approximate pixel positions on a 960×500 equirectangular canvas
 
@@ -45,7 +45,7 @@ function scoreToLabel(score: number): string {
   return 'Low Priority'
 }
 
-// ── Weight Slider ────────────────────────────────────────────────────────────────────────────
+// ── Weight Slider ──────────────────────────────────────────────────────────────
 function WeightSlider({
   label, color, description, value, onChange
 }: { label: string; color: string; description: string; value: number; onChange: (v: number) => void }) {
@@ -68,7 +68,7 @@ function WeightSlider({
   )
 }
 
-// ── Country Card ──────────────────────────────────────────────────────────────────────────────
+// ── Country Card ───────────────────────────────────────────────────────────────
 function CountryCard({ country, score, rank, isSelected, onClick }: {
   country: CountryScore; score: number; rank: number; isSelected: boolean; onClick: () => void
 }) {
@@ -106,7 +106,7 @@ function CountryCard({ country, score, rank, isSelected, onClick }: {
   )
 }
 
-// ── Detail Panel ─────────────────────────────────────────────────────────────────────────────
+// ── Detail Panel ───────────────────────────────────────────────────────────────
 function CountryDetail({ country, score, weights, onClose }: {
   country: CountryScore; score: number; weights: ScoreWeights; onClose: () => void
 }) {
@@ -183,7 +183,7 @@ function CountryDetail({ country, score, weights, onClose }: {
   )
 }
 
-// ── SVG World Map ──────────────────────────────────────────────────────────────────────────────
+// ── SVG World Map ──────────────────────────────────────────────────────────────
 function WorldDotMap({ scoredCountries, selected, onSelect }: {
   scoredCountries: Array<CountryScore & { score: number }>
   selected: string | null
@@ -213,7 +213,7 @@ function WorldDotMap({ scoredCountries, selected, onSelect }: {
         {/* Equator */}
         <line x1={0} y1={248} x2={960} y2={248} stroke="#ffffff12" strokeWidth={0.8} strokeDasharray="4 4" />
 
-        {/* Continents: approximate shapes as polygons ───────────────────── */}
+        {/* Continents: approximate shapes as polygons ─────────────────────── */}
         {/* North America */}
         <polygon points="95,85 220,75 255,105 270,145 250,190 230,230 195,250 170,235 145,200 110,170 85,130"
           fill="#1a1a2e" stroke="#2a2a4a" strokeWidth={0.8} />
@@ -253,7 +253,7 @@ function WorldDotMap({ scoredCountries, selected, onSelect }: {
         <text x={670} y={155} fill="#2d3748" fontSize={9} textAnchor="middle" fontFamily="sans-serif">ASIA</text>
         <text x={770} y={335} fill="#2d3748" fontSize={9} textAnchor="middle" fontFamily="sans-serif">AUSTRALIA</text>
 
-        {/* Country dots ────────────────────────────────────────────────────────────────────── */}
+        {/* Country dots ──────────────────────────────────────────────────────── */}
         {scoredCountries.map(c => {
           const pos = COUNTRY_POSITIONS[c.id]
           if (!pos) return null
@@ -334,7 +334,7 @@ function WorldDotMap({ scoredCountries, selected, onSelect }: {
   )
 }
 
-// ── Main Component ─────────────────────────────────────────────────────────────────────────────
+// ── Main Component ─────────────────────────────────────────────────────────────
 export default function InternationalTab() {
   const [weights, setWeights] = useState<ScoreWeights>(DEFAULT_WEIGHTS)
   const [selectedId, setSelectedId] = useState<string | null>('KR')
@@ -372,7 +372,7 @@ export default function InternationalTab() {
   return (
     <div style={{ display: 'flex', height: '100%', background: '#0a0a1a', overflow: 'hidden' }}>
 
-      {/* ── LEFT PANEL: Weight Controls ──────────────────────────────────────────────────────────────────── */}
+      {/* ── LEFT PANEL: Weight Controls ──────────────────────────────────────── */}
       <div style={{
         width: 220, flexShrink: 0, background: '#111827', borderRight: '1px solid #1f2937',
         display: 'flex', flexDirection: 'column', overflow: 'hidden'
@@ -473,7 +473,7 @@ export default function InternationalTab() {
         </div>
       </div>
 
-      {/* ── CENTER: Map + Country List ──────────────────────────────────────────────────────────────────── */}
+      {/* ── CENTER: Map + Country List ────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Map */}
         <div style={{ flex: 1, position: 'relative', minHeight: 0 }}>
@@ -541,7 +541,7 @@ export default function InternationalTab() {
         </div>
       </div>
 
-      {/* ── RIGHT PANEL: Country Detail ───────────────────────────────────────────────────────────────────────────── */}
+      {/* ── RIGHT PANEL: Country Detail ───────────────────────────────────────── */}
       <div style={{
         width: 280, flexShrink: 0, borderLeft: '1px solid #1f2937',
         display: 'flex', flexDirection: 'column', overflow: 'hidden'
