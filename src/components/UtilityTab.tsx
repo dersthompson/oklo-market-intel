@@ -82,7 +82,7 @@ function UtilityCard({ utility }: { utility: Utility }) {
                 {utility.existingNuclear.map(p => (
                   <div key={p} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                     <div style={{ width: 4, height: 4, borderRadius: '50%', background: '#06b6d4', flexShrink: 0 }} />
-                    <span style={{ fontSize: 12, color: '#cbd5e1' }}>{e}</span>
+                    <span style={{ fontSize: 12, color: '#cbd5e1' }}>{p}</span>
                   </div>
                 ))}
               </div>
