@@ -6,6 +6,7 @@ import {
   type CountryScore, type ScoreWeights
 } from '@/lib/international'
 import 'leaflet/dist/leaflet.css'
+import worldAtlasData from 'world-atlas/countries-110m.json'
 
 // ISO numeric -> ISO 2-letter mapping for world-atlas TopoJSON
 const NUMERIC_TO_ISO2: Record<number, string> = {
@@ -138,7 +139,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
   const mapRef = useRef<any>(null)
   const layerRef = useRef<any>(null)
 
-  // ── Init map once on mount ─────────────────────────────────────────────────
+  // ââ Init map once on mount âââââââââââââââââââââââââââââââââââââââââââââââââ
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     let cancelled = false
@@ -164,12 +165,9 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
         { subdomains: 'abcd', maxZoom: 19 }
       ).addTo(map)
 
-      // Fetch world topology
-      const res = await fetch(
-        'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
-      )
+      // Use bundled world topology (no CDN fetch needed)
       if (cancelled) return
-      const world = await res.json()
+      const world = worldAtlasData as any
       const geojson = topo.feature(world, world.objects.countries) as any
 
       // Build ISO numeric -> ISO2 lookup from existing NUMERIC_TO_ISO2
@@ -196,7 +194,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
             }
             const score = (window as any).__scoreMap__?.[iso2]
             layer.bindTooltip(
-              iso2 ? `<strong>${iso2}</strong> · ${score != null ? score.toFixed(1) : 'N/A'}` : 'No data',
+              iso2 ? `<strong>${iso2}</strong> Â· ${score != null ? score.toFixed(1) : 'N/A'}` : 'No data',
               { sticky: true, className: 'leaflet-tooltip-dark' }
             ).openTooltip()
           })
@@ -229,7 +227,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
       applySelection()
     }
 
-    init()
+    init().catch(err => console.error('[WorldMap] init failed:', err))
     return () => {
       cancelled = true
     }
@@ -246,7 +244,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
     }
   }, [])
 
-  // ── Reactive: update fill colours when scoreMap changes ───────────────────
+  // ââ Reactive: update fill colours when scoreMap changes âââââââââââââââââââ
   useEffect(() => {
     ;(window as any).__scoreMap__ = scoreMap
     if (!layerRef.current) return
@@ -256,7 +254,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
     })
   }, [scoreMap])
 
-  // ── Reactive: update selection highlight ──────────────────────────────────
+  // ââ Reactive: update selection highlight ââââââââââââââââââââââââââââââââââ
   useEffect(() => {
     ;(window as any).__selectedId__ = selectedId
     if (!(window as any).__applyMapSelection__) return
