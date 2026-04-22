@@ -138,103 +138,137 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
   const mapRef = useRef<any>(null)
   const layerRef = useRef<any>(null)
 
-  // Rebuild the choropleth whenever scores or selection change
+  // ── Init map once on mount ─────────────────────────────────────────────────
   useEffect(() => {
-    if (!containerRef.current) return
+    if (!containerRef.current || mapRef.current) return
     let cancelled = false
 
     async function init() {
       const L = (await import('leaflet')).default
       const topo = await import('topojson-client')
+      if (cancelled || !containerRef.current) return
 
-      if (cancelled) return
+      const map = L.map(containerRef.current, {
+        center: [20, 0],
+        zoom: 2,
+        minZoom: 1,
+        maxZoom: 6,
+        zoomControl: true,
+        attributionControl: false,
+        worldCopyJump: false,
+      })
+      mapRef.current = map
 
-      // Init map once
-      if (!mapRef.current) {
-        mapRef.current = L.map(containerRef.current!, {
-          center: [20, 10],
-          zoom: 2,
-          minZoom: 1,
-          maxZoom: 6,
-          zoomControl: true,
-          attributionControl: false,
-          worldCopyJump: false,
-        })
-
-        // Dark tile background
-        L.tileLayer(
-          'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
-          { maxZoom: 6, subdomains: 'abcd' }
-        ).addTo(mapRef.current)
-      }
-
-      const map = mapRef.current
-
-      // Remove old layer
-      if (layerRef.current) { map.removeLayer(layerRef.current); layerRef.current = null }
+      L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
+        { subdomains: 'abcd', maxZoom: 19 }
+      ).addTo(map)
 
       // Fetch world topology
-      let topoData: any
-      try {
-        const res = await fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
-        topoData = await res.json()
-      } catch { return }
-
+      const res = await fetch(
+        'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json'
+      )
       if (cancelled) return
+      const world = await res.json()
+      const geojson = topo.feature(world, world.objects.countries) as any
 
-      const countries = (topo as any).feature(topoData, topoData.objects.countries)
-
-      const layer = L.geoJSON(countries, {
+      // Build ISO numeric -> ISO2 lookup from existing NUMERIC_TO_ISO2
+      const geoLayer = L.geoJSON(geojson, {
         style: (feature: any) => {
-          const numCode = parseInt(feature.id)
-          const iso2 = NUMERIC_TO_ISO2[numCode]
-          const score = iso2 ? scoreMap[iso2] : undefined
-          if (score === undefined) {
-            return { fillColor: '#1e293b', fillOpacity: 0.5, color: '#334155', weight: 0.5 }
-          }
-          const color = scoreToColor(score)
-          const isSelected = iso2 === selectedId
+          const num = parseInt(feature?.properties?.id ?? feature?.properties?.numeric ?? '0', 10)
+          const iso2 = NUMERIC_TO_ISO2[num] ?? ''
+          const score = (window as any).__scoreMap__?.[iso2]
           return {
-            fillColor: color,
-            fillOpacity: isSelected ? 0.9 : 0.65,
-            color: isSelected ? '#fff' : '#334155',
-            weight: isSelected ? 2 : 0.5,
+            fillColor: scoreToColor(score),
+            fillOpacity: 0.85,
+            color: '#333',
+            weight: 0.5,
           }
         },
-        onEachFeature: (feature: any, lyr: any) => {
-          const numCode = parseInt(feature.id)
-          const iso2 = NUMERIC_TO_ISO2[numCode]
-          const score = iso2 ? scoreMap[iso2] : undefined
-          if (iso2 && score !== undefined) {
-            const country = COUNTRIES.find(c => c.id === iso2)
-            const label = `<b>${country?.flagEmoji ?? ''} ${country?.name ?? iso2}</b><br/>Score: <b style="color:${scoreToColor(score)}">${score}</b> -- ${scoreToLabel(score)}<br/><span style="font-size:10px;color:#9ca3af">${country?.subregion ?? ''}</span>`
-            lyr.bindTooltip(label, { sticky: true })
-            lyr.on('click', () => onSelect(iso2))
-          }
-          lyr.on('mouseover', function (this: any) { this.setStyle({ fillOpacity: 0.85 }) })
-          lyr.on('mouseout', function (this: any) {
-            const s = iso2 ? scoreMap[iso2] : undefined
-            this.setStyle({ fillOpacity: iso2 === selectedId ? 0.9 : (s !== undefined ? 0.65 : 0.5) })
-          })
-        }
-      })
+        onEachFeature: (feature: any, layer: any) => {
+          const num = parseInt(feature?.properties?.id ?? feature?.properties?.numeric ?? '0', 10)
+          const iso2 = NUMERIC_TO_ISO2[num] ?? ''
+          layer._iso2 = iso2
 
-      layer.addTo(map)
-      layerRef.current = layer
+          layer.on('mouseover', () => {
+            if (iso2 !== (window as any).__selectedId__) {
+              layer.setStyle({ weight: 1.5, color: '#aaa' })
+            }
+            const score = (window as any).__scoreMap__?.[iso2]
+            layer.bindTooltip(
+              iso2 ? `<strong>${iso2}</strong> · ${score != null ? score.toFixed(1) : 'N/A'}` : 'No data',
+              { sticky: true, className: 'leaflet-tooltip-dark' }
+            ).openTooltip()
+          })
+          layer.on('mouseout', () => {
+            geoLayer.resetStyle(layer)
+            applySelection()
+          })
+          layer.on('click', () => {
+            if (iso2) onSelect(iso2)
+          })
+        },
+      }).addTo(map)
+
+      layerRef.current = geoLayer
+
+      function applySelection() {
+        const sel = (window as any).__selectedId__
+        geoLayer.eachLayer((l: any) => {
+          const score = (window as any).__scoreMap__?.[l._iso2]
+          l.setStyle({
+            fillColor: scoreToColor(score),
+            fillOpacity: 0.85,
+            color: l._iso2 === sel ? '#fff' : '#333',
+            weight: l._iso2 === sel ? 2.5 : 0.5,
+          })
+        })
+      }
+
+      ;(window as any).__applyMapSelection__ = applySelection
+      applySelection()
     }
 
     init()
-    return () => { cancelled = true }
-  }, [scoreMap, selectedId, onSelect])
+    return () => {
+      cancelled = true
+    }
+  }, []) // init once
 
-  // Cleanup on unmount
+  // Cleanup map on component unmount
   useEffect(() => {
     return () => {
-      if (mapRef.current) { mapRef.current.remove(); mapRef.current = null }
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+        layerRef.current = null
+      }
     }
   }, [])
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
+  // ── Reactive: update fill colours when scoreMap changes ───────────────────
+  useEffect(() => {
+    ;(window as any).__scoreMap__ = scoreMap
+    if (!layerRef.current) return
+    layerRef.current.eachLayer((l: any) => {
+      const score = scoreMap[l._iso2]
+      l.setStyle({ fillColor: scoreToColor(score), fillOpacity: 0.85 })
+    })
+  }, [scoreMap])
+
+  // ── Reactive: update selection highlight ──────────────────────────────────
+  useEffect(() => {
+    ;(window as any).__selectedId__ = selectedId
+    if (!(window as any).__applyMapSelection__) return
+    ;(window as any).__applyMapSelection__()
+  }, [selectedId])
+
+  return (
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', minHeight: 320 }}
+    />
+  )
 }
 
 // -- Main Component -------------------------------------------------------------
