@@ -47,8 +47,8 @@ export async function GET() {
       if (!res.ok) throw new Error('EIA API returned ' + res.status)
       const json = await res.json()
       const records = json.response?.data || []
-      const latestByState = {}
-      const secondLatestByState = {}
+      const latestByState: Record<string, number> = {}
+      const secondLatestByState: Record<string, number> = {}
       const seenStates = new Set()
       records.forEach((r: any) => {
         const state = r.stateid
