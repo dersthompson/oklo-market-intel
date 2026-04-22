@@ -5,6 +5,7 @@ import {
   COUNTRIES, DEFAULT_WEIGHTS, computeWeightedScore, SCORE_DIMENSIONS, REGION_LABELS,
   type CountryScore, type ScoreWeights
 } from '@/lib/international'
+import 'leaflet/dist/leaflet.css'
 
 // ISO numeric -> ISO 2-letter mapping for world-atlas TopoJSON
 const NUMERIC_TO_ISO2: Record<number, string> = {
@@ -144,7 +145,6 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
 
     async function init() {
       const L = (await import('leaflet')).default
-      await import('leaflet/dist/leaflet.css')
       const topo = await import('topojson-client')
 
       if (cancelled) return
