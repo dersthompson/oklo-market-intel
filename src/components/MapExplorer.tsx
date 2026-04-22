@@ -185,7 +185,7 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           const fips = feature.id?.toString().padStart(2, '0') || ''
           const abbr = fipsToAbbr[fips] || ''
           const friendly = NUCLEAR_FRIENDLY_STATES.includes(abbr)
-          layer.bindTooltip(`${abbr}: ${friendly ? '✓ Nuclear Friendly' : '⚠ Moratorium / Neutral'}`, { sticky: true })
+          layer.bindTooltip(`${abbr}: ${friendly ? 'â Nuclear Friendly' : 'â  Moratorium / Neutral'}`, { sticky: true })
         }
       })
       layer.addTo(map)
@@ -240,8 +240,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
             ? value ? `$${value.toLocaleString()}` : 'N/A'
             : value ? `${value.toFixed(1)}%` : 'N/A'
           const sourceNote = type === 'income'
-            ? '<br><span style="font-size:10px;color:#6b7280">Annual ACS 5-yr est. • Trend: see Census ACS YoY</span>'
-            : '<br><span style="font-size:10px;color:#6b7280">Annual ACS 5-yr est. • Monthly BLS data by state only</span>'
+            ? '<br><span style="font-size:10px;color:#6b7280">Annual ACS 5-yr est. â¢ Trend: see Census ACS YoY</span>'
+            : '<br><span style="font-size:10px;color:#6b7280">Annual ACS 5-yr est. â¢ Monthly BLS data by state only</span>'
           layer.bindTooltip(
             `<b>${feature.properties?.name || 'County'}</b><br>${type === 'income' ? 'Median Income' : 'Unemployment'}: ${formatted}${sourceNote}`,
             { sticky: true }
@@ -301,7 +301,7 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   }
 
   const addGovLandLayer = async (L: any, map: any) => {
-    // Simplified federal land polygons — major DOE/DOD/BLM areas relevant to nuclear siting
+    // Simplified federal land polygons â major DOE/DOD/BLM areas relevant to nuclear siting
     // Using approximate bounding boxes for key sites
     const fedLandAreas = [
       { name: 'Idaho National Lab', coords: [[43.2, -113.5], [44.0, -113.5], [44.0, -112.0], [43.2, -112.0]] },
@@ -328,19 +328,19 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
   }
 
   const getElectricityColor = (price: number) => {
-    if (price < 9)  return '#166534'  // very cheap — dark green
-    if (price < 11) return '#22c55e'  // cheap — green
-    if (price < 13) return '#84cc16'  // near avg — lime
-    if (price < 16) return '#fbbf24'  // moderate — yellow
-    if (price < 20) return '#f97316'  // expensive — orange
-    if (price < 26) return '#ef4444'  // high — red
-    return '#7f1d1d'                  // very high — dark red
+    if (price < 9)  return '#166534'  // very cheap â dark green
+    if (price < 11) return '#22c55e'  // cheap â green
+    if (price < 13) return '#84cc16'  // near avg â lime
+    if (price < 16) return '#fbbf24'  // moderate â yellow
+    if (price < 20) return '#f97316'  // expensive â orange
+    if (price < 26) return '#ef4444'  // high â red
+    return '#7f1d1d'                  // very high â dark red
   }
 
   const getElectricityTrendHtml = (price: number, prev: number | undefined) => {
     if (prev === undefined) return ''
     const delta = price - prev
-    return `<br><span style="font-size:10px;color:${delta>0?'#ef4444':delta<0?'#22c55e':'#9ca3af'}">${delta>0?'↑':'↓'} ${Math.abs(delta).toFixed(1)}¢ vs prev month</span>`
+    return `<br><span style="font-size:10px;color:${delta>0?'#ef4444':delta<0?'#22c55e':'#9ca3af'}">${delta>0?'â':'â'} ${Math.abs(delta).toFixed(1)}Â¢ vs prev month</span>`
   }
 
   const addElectricityLayer = async (L: any, map: any) => {
@@ -356,6 +356,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
 
       const priceData: Record<string, number> = priceJson.data || {}
       const prevData: Record<string, number> = priceJson.prevData || {}
+      // County-level rates from EIA Form 861 utility territories
+      const countyRates: Record<string, number> = priceJson.countyData || {}
 
       // Cache for zip info lookup
       electricityDataRef.current = priceData
@@ -385,8 +387,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           const prev = prevData[abbr]
           const trendHtml = getElectricityTrendHtml(price || 0, prev)
           const label = price
-            ? `<b>${abbr}</b><br>⚡ ${price.toFixed(1)}¢/kWh avg retail${trendHtml}<br><span style="font-size:11px;color:#9ca3af">${
-                price < 11 ? '✓ Low cost' : price < 16 ? '~ US avg' : price < 22 ? '↑ Above avg' : '⚠ High cost'
+            ? `<b>${abbr}</b><br>â¡ ${price.toFixed(1)}Â¢/kWh avg retail${trendHtml}<br><span style="font-size:11px;color:#9ca3af">${
+                price < 11 ? 'â Low cost' : price < 16 ? '~ US avg' : price < 22 ? 'â Above avg' : 'â  High cost'
               }</span>`
             : `<b>${abbr}</b><br>No data`
           layer.bindTooltip(label, { sticky: true })
@@ -398,7 +400,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           const countyFips = feature.id?.toString().padStart(5, '0') || ''
           const stateFips = countyFips.substring(0, 2)
           const stateAbbr = FIPS_TO_ABBR[stateFips] || ''
-          const price = priceData[stateAbbr]
+          // Use county-specific rate; fall back to state avg
+          const price = countyRates[countyFips] ?? priceData[stateAbbr]
           if (!price) return { fillColor: '#1f2937', fillOpacity: 0.3, color: '#374151', weight: 0.3 }
           return { fillColor: getElectricityColor(price), fillOpacity: 0.6, color: '#374151', weight: 0.3, opacity: 0.5 }
         },
@@ -406,12 +409,18 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
           const countyFips = feature.id?.toString().padStart(5, '0') || ''
           const stateFips = countyFips.substring(0, 2)
           const stateAbbr = FIPS_TO_ABBR[stateFips] || ''
-          const price = priceData[stateAbbr]
+          const countyPrice = countyRates[countyFips]
+          const statePrice = priceData[stateAbbr]
+          const price = countyPrice ?? statePrice
           const prev = prevData[stateAbbr]
           const trendHtml = getElectricityTrendHtml(price || 0, prev)
+          const hasCountyData = countyPrice !== undefined
+          const sourceNote = hasCountyData
+            ? '<span style="font-size:10px;color:#6b7280">EIA Form 861</span>'
+            : '<span style="font-size:10px;color:#6b7280">State avg</span>'
           const label = price
-            ? `<b>${feature.properties?.name || 'County'}, ${stateAbbr}</b><br>⚡ ${price.toFixed(1)}¢/kWh (state avg)${trendHtml}<br><span style="font-size:10px;color:#6b7280">County-level EIA data not available — using state average</span>`
-            : `<b>${feature.properties?.name || 'County'}, ${stateAbbr}</b><br>No data`
+            ? '<b>' + (feature.properties?.name || 'County') + ', ' + stateAbbr + '</b><br>' + price.toFixed(1) + '¢/kWh' + trendHtml + '<br>' + sourceNote
+            : '<b>' + (feature.properties?.name || 'County') + ', ' + stateAbbr + '</b><br>No data'
           layer.bindTooltip(label, { sticky: true })
         }
       })
@@ -430,8 +439,8 @@ export default function MapExplorer({ activeLayers, searchedZip, onSiteSelect, o
         const div = L.DomUtil.create('div')
         div.style.cssText = 'background:rgba(17,24,39,0.92);padding:8px 10px;border-radius:8px;border:1px solid #374151;font-size:11px;color:#e2e8f0;'
         div.innerHTML = `
-          <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">Retail Price (¢/kWh)</div>
-          ${[['#166534','< 9¢'],['#22c55e','9–11¢'],['#84cc16','11–13¢'],['#fbbf24','13–16¢'],['#f97316','16–20¢'],['#ef4444','20–26¢'],['#7f1d1d','> 26¢']]
+          <div style="font-weight:700;margin-bottom:6px;font-size:10px;color:#9ca3af;text-transform:uppercase;letter-spacing:.05em;">Retail Price (Â¢/kWh)</div>
+          ${[['#166534','< 9Â¢'],['#22c55e','9â11Â¢'],['#84cc16','11â13Â¢'],['#fbbf24','13â16Â¢'],['#f97316','16â20Â¢'],['#ef4444','20â26Â¢'],['#7f1d1d','> 26Â¢']]
             .map(([c,l]) => `<div style="display:flex;align-items:center;gap:5px;margin:2px 0"><div style="width:12px;height:12px;background:${c};border-radius:2px;flex-shrink:0"></div>${l}</div>`)
             .join('')}
         `
