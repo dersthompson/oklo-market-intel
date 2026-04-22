@@ -60,7 +60,7 @@ export async function GET() {
       stateData = { ...STATIC_PRICES, ...latestByState }
       prevData = { ...PREV_PRICES, ...secondLatestByState }
       source = 'eia'
-    } catch (e) { fallbackReason = e.message }
+    } catch (e: any) { fallbackReason = (e as any).message }
   }
 
   const countyData: Record<string, number> = {}
