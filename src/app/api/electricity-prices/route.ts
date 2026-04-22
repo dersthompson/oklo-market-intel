@@ -49,7 +49,7 @@ export async function GET() {
       const records = json.response?.data || []
       const latestByState: Record<string, number> = {}
       const secondLatestByState: Record<string, number> = {}
-      const seenStates = new Set()
+      const seenStates = new Set<string>()
       records.forEach((r: any) => {
         const state = r.stateid
         if (state && r.price != null) {
@@ -63,7 +63,7 @@ export async function GET() {
     } catch (e) { fallbackReason = e.message }
   }
 
-  const countyData = {}
+  const countyData: Record<string, number> = {}
   for (const [fips, rate] of Object.entries(COUNTY_ELECTRICITY_RATES)) {
     const stateAbbr = FIPS_TO_ABBR[fips.substring(0, 2)]
     if (!stateAbbr) continue
