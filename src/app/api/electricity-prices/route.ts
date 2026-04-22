@@ -50,7 +50,7 @@ export async function GET() {
       const latestByState = {}
       const secondLatestByState = {}
       const seenStates = new Set()
-      records.forEach((r) => {
+      records.forEach((r: any) => {
         const state = r.stateid
         if (state && r.price != null) {
           if (!seenStates.has(state)) { latestByState[state] = parseFloat(r.price); seenStates.add(state) }
