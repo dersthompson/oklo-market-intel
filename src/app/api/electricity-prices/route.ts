@@ -1,9 +1,8 @@
 import { NextResponse } from 'next/server'
+import { COUNTY_ELECTRICITY_RATES } from '@/lib/county-electricity'
 
 export const revalidate = 86400 // 24h cache
 
-// Static average retail electricity prices by state (cents/kWh) — EIA 2023 annual averages
-// Source: EIA Electric Power Monthly, Table 5.6.A
 const STATIC_PRICES: Record<string, number> = {
   AL: 13.1, AK: 22.5, AZ: 12.7, AR: 10.2, CA: 29.4, CO: 13.8, CT: 28.6, DE: 14.1,
   DC: 15.8, FL: 14.2, GA: 12.0, HI: 39.7, ID: 10.2, IL: 13.4, IN: 12.2, IA: 12.0,
@@ -14,7 +13,6 @@ const STATIC_PRICES: Record<string, number> = {
   WV: 12.9, WI: 16.6, WY: 9.5,
 }
 
-// Prior month estimates — realistic month-over-month changes (mostly ±0.3-0.5¢, some larger swings)
 const PREV_PRICES: Record<string, number> = {
   AL: 12.9, AK: 22.8, AZ: 12.4, AR: 10.0, CA: 29.1, CO: 13.6, CT: 28.4, DE: 14.0,
   DC: 15.6, FL: 14.0, GA: 12.1, HI: 39.9, ID: 10.1, IL: 13.3, IN: 12.1, IA: 11.9,
@@ -25,43 +23,56 @@ const PREV_PRICES: Record<string, number> = {
   WV: 12.8, WI: 16.4, WY: 9.6,
 }
 
+const FIPS_TO_ABBR: Record<string, string> = {
+  '01':'AL','02':'AK','04':'AZ','05':'AR','06':'CA','08':'CO','09':'CT','10':'DE',
+  '11':'DC','12':'FL','13':'GA','15':'HI','16':'ID','17':'IL','18':'IN','19':'IA',
+  '20':'KS','21':'KY','22':'LA','23':'ME','24':'MD','25':'MA','26':'MI','27':'MN',
+  '28':'MS','29':'MO','30':'MT','31':'NE','32':'NV','33':'NH','34':'NJ','35':'NM',
+  '36':'NY','37':'NC','38':'ND','39':'OH','40':'OK','41':'OR','42':'PA','44':'RI',
+  '45':'SC','46':'SD','47':'TN','48':'TX','49':'UT','50':'VT','51':'VA','53':'WA',
+  '54':'WV','55':'WI','56':'WY','72':'PR',
+}
+
 export async function GET() {
   const apiKey = process.env.EIA_API_KEY
+  let stateData = STATIC_PRICES
+  let prevData = PREV_PRICES
+  let source = 'static'
+  let fallbackReason
 
-  if (!apiKey) {
-    return NextResponse.json({ source: 'static', data: STATIC_PRICES, prevData: PREV_PRICES })
-  }
-
-  try {
-    // EIA v2 API — retail electricity sales, all-sectors price by state, most recent monthly data
-    const url = `https://api.eia.gov/v2/electricity/retail-sales/data/?api_key=${apiKey}&data[0]=price&facets[sectorName][]=all+sectors&frequency=monthly&sort[0][column]=period&sort[0][direction]=desc&length=120`
-    const res = await fetch(url, { next: { revalidate: 86400 } })
-    if (!res.ok) throw new Error(`EIA API returned ${res.status}`)
-    const json = await res.json()
-
-    // Keep the most recent value per state and second-most recent (for prevData)
-    const records: any[] = json.response?.data || []
-    const latestByState: Record<string, number> = {}
-    const secondLatestByState: Record<string, number> = {}
-    const seenStates = new Set<string>()
-
-    records.forEach((r: any) => {
-      const state = r.stateid
-      if (state && r.price != null) {
-        if (!seenStates.has(state)) {
-          latestByState[state] = parseFloat(r.price)
-          seenStates.add(state)
-        } else if (!secondLatestByState[state]) {
-          secondLatestByState[state] = parseFloat(r.price)
+  if (apiKey) {
+    try {
+      const url = 'https://api.eia.gov/v2/electricity/retail-sales/data/?api_key=' + apiKey + '&data[0]=price&facets[sectorName][]=all+sectors&frequency=monthly&sort[0][column]=period&sort[0][direction]=desc&length=120'
+      const res = await fetch(url, { next: { revalidate: 86400 } })
+      if (!res.ok) throw new Error('EIA API returned ' + res.status)
+      const json = await res.json()
+      const records = json.response?.data || []
+      const latestByState = {}
+      const secondLatestByState = {}
+      const seenStates = new Set()
+      records.forEach((r) => {
+        const state = r.stateid
+        if (state && r.price != null) {
+          if (!seenStates.has(state)) { latestByState[state] = parseFloat(r.price); seenStates.add(state) }
+          else if (!secondLatestByState[state]) { secondLatestByState[state] = parseFloat(r.price) }
         }
-      }
-    })
-
-    // Merge with static fallback for any missing states
-    const merged = { ...STATIC_PRICES, ...latestByState }
-    const mergedPrev = { ...PREV_PRICES, ...secondLatestByState }
-    return NextResponse.json({ source: 'eia', data: merged, prevData: mergedPrev })
-  } catch (e: any) {
-    return NextResponse.json({ source: 'static', data: STATIC_PRICES, prevData: PREV_PRICES, fallbackReason: e.message })
+      })
+      stateData = { ...STATIC_PRICES, ...latestByState }
+      prevData = { ...PREV_PRICES, ...secondLatestByState }
+      source = 'eia'
+    } catch (e) { fallbackReason = e.message }
   }
+
+  const countyData = {}
+  for (const [fips, rate] of Object.entries(COUNTY_ELECTRICITY_RATES)) {
+    const stateAbbr = FIPS_TO_ABBR[fips.substring(0, 2)]
+    if (!stateAbbr) continue
+    if (source === 'eia' && stateData[stateAbbr] && STATIC_PRICES[stateAbbr]) {
+      countyData[fips] = Math.round(rate * (stateData[stateAbbr] / STATIC_PRICES[stateAbbr]) * 10) / 10
+    } else {
+      countyData[fips] = rate
+    }
+  }
+
+  return NextResponse.json({ source, data: stateData, prevData, countyData, ...(fallbackReason ? { fallbackReason } : {}) })
 }
