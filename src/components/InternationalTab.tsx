@@ -139,7 +139,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
   const mapRef = useRef<any>(null)
   const layerRef = useRef<any>(null)
 
-  // ââ Init map once on mount âââââââââââââââââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ Init map once on mount Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   useEffect(() => {
     if (!containerRef.current || mapRef.current) return
     let cancelled = false
@@ -194,7 +194,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
             }
             const score = (window as any).__scoreMap__?.[iso2]
             layer.bindTooltip(
-              iso2 ? `<strong>${iso2}</strong> Â· ${score != null ? score.toFixed(1) : 'N/A'}` : 'No data',
+              iso2 ? `<strong>${iso2}</strong> ÃÂ· ${score != null ? score.toFixed(1) : 'N/A'}` : 'No data',
               { sticky: true, className: 'leaflet-tooltip-dark' }
             ).openTooltip()
           })
@@ -225,6 +225,12 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
 
       ;(window as any).__applyMapSelection__ = applySelection
       applySelection()
+
+      // Fix Leaflet size after flex layout resolves
+      requestAnimationFrame(() => { if (!cancelled) map.invalidateSize() })
+      const ro = new ResizeObserver(() => { if (mapRef.current) mapRef.current.invalidateSize() })
+      if (containerRef.current) ro.observe(containerRef.current)
+      ;(map as any)._ro = ro
     }
 
     init().catch(err => console.error('[WorldMap] init failed:', err))
@@ -237,6 +243,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
   useEffect(() => {
     return () => {
       if (mapRef.current) {
+        if ((mapRef.current as any)._ro) (mapRef.current as any)._ro.disconnect()
         mapRef.current.remove()
         mapRef.current = null
         layerRef.current = null
@@ -244,7 +251,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
     }
   }, [])
 
-  // ââ Reactive: update fill colours when scoreMap changes âââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ Reactive: update fill colours when scoreMap changes Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   useEffect(() => {
     ;(window as any).__scoreMap__ = scoreMap
     if (!layerRef.current) return
@@ -254,7 +261,7 @@ function WorldMap({ scoreMap, selectedId, onSelect }: {
     })
   }, [scoreMap])
 
-  // ââ Reactive: update selection highlight ââââââââââââââââââââââââââââââââââ
+  // Ã¢ÂÂÃ¢ÂÂ Reactive: update selection highlight Ã¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂÃ¢ÂÂ
   useEffect(() => {
     ;(window as any).__selectedId__ = selectedId
     if (!(window as any).__applyMapSelection__) return
