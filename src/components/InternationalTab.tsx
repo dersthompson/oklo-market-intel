@@ -39,6 +39,11 @@ function scoreToColor(score: number | undefined): string {
   }
   return COLOR_STOPS[COLOR_STOPS.length-1][1]
 }
+function countryCodeToFlag(code: string): string {
+  return [...code.toUpperCase()].map(c =>
+    String.fromCodePoint(c.charCodeAt(0) - 65 + 0x1F1E6)
+  ).join('')
+}
 function scoreToLabel(score: number | undefined): string {
   if (score == null) return 'No data'
   if (score >= 75) return 'Tier 1'
@@ -68,7 +73,7 @@ function WeightSlider({ label, color, description, value, onChange }: {
   )
 }
 
-// ── Radar Chart ────────────────────────────────────────────────────────────
+// ── Radar Chart ─────────────────────────────────────────────────────────────
 function RadarChart({ countries, scores }: {
   countries: Array<{ country: CountryScore & { score: number }; color: string }>
   scores: Record<string, number>
@@ -133,7 +138,7 @@ function RadarChart({ countries, scores }: {
 function CompetitorBadges({ competitors }: { competitors: CountryScore['competitors'] }) {
   if (!competitors || competitors.length === 0)
     return <span style={{ fontSize:10, color:'#4b5563', fontStyle:'italic' }}>No known competitors</span>
-  const presenceLabel: Record<string, string> = { active:'Active', bidding:'Bidding', mou:'MOU', exploring:'Exploring' }
+  const presenceLabel: Recordd<string, string> = { active:'Active', bidding:'Bidding', mou:'MOU', exploring:'Exploring' }
   const presenceAlpha: Record<string, string> = { active:'ff', bidding:'cc', mou:'aa', exploring:'66' }
   return (
     <div style={{ display:'flex', flexWrap:'wrap', gap:4 }}>
@@ -183,7 +188,7 @@ function ComparePanel({ countries, onRemove, onClose }: {
               <button onClick={() => onRemove(c.id)} style={{ position:'absolute', top:0, right:0, background:'none', border:'none', cursor:'pointer', color:'#4b5563' }}>
                 <X size={12} />
               </button>
-              <div style={{ fontSize:28, marginBottom:4 }}>{c.flagEmoji}</div>
+              <div style={{ fontSize:28, marginBottom:4 }}>{countryCodeToFlag(c.id)}</div>
               <div style={{ fontSize:13, fontWeight:700, color:'#e2e8f0' }}>{c.name}</div>
               <div style={{ fontSize:22, fontWeight:800, color:COLORS[i], margin:'4px 0' }}>{c.score}</div>
               <div style={{ fontSize:10, color:'#6b7280' }}>{scoreToLabel(c.score)}</div>
@@ -209,7 +214,7 @@ function ComparePanel({ countries, onRemove, onClose }: {
 
         {/* Dimension breakdown table */}
         <div style={{ marginBottom:20 }}>
-          <div style={{ fontSize:10, color:'#6f7280', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, marginBottom:8 }}>Dimension Scores</div>
+          <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, marginBottom:8 }}>Dimension Scores</div>
           {SCORE_DIMENSIONS.map(d => {
             const vals = countries.map(c => c[d.key as keyof CountryScore] as number)
             const best = Math.max(...vals)
@@ -245,7 +250,7 @@ function ComparePanel({ countries, onRemove, onClose }: {
               <span style={{ fontSize:10, color:'#6b7280' }}> GW</span>
             </div>
           ))}
-          <div style={{ fontSize:10, color:'#6f7280', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
+          <div style={{ fontSize:10, color:'#6b7280', textTransform:'uppercase', letterSpacing:'0.05em', fontWeight:600, display:'flex', alignItems:'center', gap:5 }}>
             <Clock size={10} /> Opportunity
           </div>
           {countries.map(c => (
@@ -287,7 +292,7 @@ function CountryDetail({ country, score, weights }: {
     <div style={{ background:'#111827', border:'1px solid #374151', borderRadius:12, overflow:'hidden', height:'100%', display:'flex', flexDirection:'column' }}>
       <div style={{ padding:'14px 16px', borderBottom:'1px solid #1f2937', display:'flex', alignItems:'center', justifyContent:'space-between', background:'#0f172a' }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
-          <span style={{ fontSize:24 }}>{country.flagEmoji}</span>
+          <span style={{ fontSize:24 }}>{countryCodeToFlag(country.id)}</span>
           <div>
             <div style={{ fontSize:15, fontWeight:700, color:'#e2e8f0' }}>{country.name}</div>
             <div style={{ fontSize:11, color:'#6b7280' }}>{country.subregion}</div>
@@ -311,7 +316,7 @@ function CountryDetail({ country, score, weights }: {
                 <span style={{ fontSize:11, fontWeight:700, color:d.color }}>{d.raw.toFixed(1)}</span>
               </div>
               <div style={{ height:5, background:'#1f2937', borderRadius:3, overflow:'hidden' }}>
-                <div style={{ height:'100%', width:`$x(d.raw/10)*100}%`, background:d.color, borderRadius:3 }} />
+                <div style={{ height:'100%', width:`${(d.raw/10)*100}%`, background:d.color, borderRadius:3 }} />
               </div>
             </div>
           ))}
@@ -654,7 +659,7 @@ export default function InternationalTab() {
                       style={{ position:'absolute', top:3, right:3, width:14, height:14, borderRadius:3, background: inCompare ? '#f97316' : '#1f2937', border:`1px solid ${inCompare ? '#f97316' : '#374151'}`, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', padding:0, fontSize:9, color: inCompare ? '#fff' : '#6b7280', lineHeight:1 }}>
                       {inCompare ? '✓' : '+'}
                     </button>
-                    <div style={{ fontSize:17 }}>{c.flagEmoji}</div>
+                    <div style={{ fontSize:17 }}>{countryCodeToFlag(c.id)}</div>
                     <div style={{ fontSize:16, fontWeight:800, color, lineHeight:1 }}>{c.score}</div>
                     <div style={{ fontSize:9, color:'#9ca3af', textAlign:'center', lineHeight:1.2 }}>{c.name}</div>
                     <div style={{ fontSize:9, padding:'1px 5px', borderRadius:4, background:`${color}25`, color, fontWeight:600 }}>#{i+1}</div>
